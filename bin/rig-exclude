@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# usage: rig-exclude <path-inside-project>
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+die() { echo "rig-exclude: $*" >&2; exit 1; }
+
+[ $# -eq 1 ] || die "usage: rig-exclude <path-inside-project>"
+git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$1 is not inside a git repository"
+
+common_dir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)
+exclude="$common_dir/info/exclude"
+begin="# >>> openrig-teams"
+end="# <<< openrig-teams"
+
+skills=$(grep -ho 'skills: \[[^]]*\]' "$root"/agents/*/*/agent.yaml \
+  | sed 's/skills: \[//; s/\]//' | tr ',' '\n' | tr -d ' ' | sort -u)
+
+block() {
+  echo "$begin"
+  printf '%s\n' CLAUDE.local.md .mcp.json .openrig/ .claude/settings.local.json ".claude/plugins/shared:openrig-core/"
+  for skill in $skills; do echo ".claude/skills/$skill/"; done
+  echo "$end"
+}
+
+paths=$(block | grep -v '^#')
+collisions=$(cd "$(dirname "$common_dir")" && git ls-files -- $paths)
+if [ -n "$collisions" ]; then
+  echo "rig-exclude: the project tracks paths OpenRig overwrites; ask the human before starting teams:" >&2
+  printf '  %s\n' $collisions >&2
+  exit 2
+fi
+
+mkdir -p "$(dirname "$exclude")"
+touch "$exclude"
+kept=$(sed "/^$begin\$/,/^$end\$/d" "$exclude")
+{ [ -n "$kept" ] && printf '%s\n' "$kept"; block; } > "$exclude.tmp"
+mv "$exclude.tmp" "$exclude"
+
+echo "updated $exclude (applies to every worktree of $(basename "$(dirname "$common_dir")"))"

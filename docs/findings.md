@@ -36,6 +36,9 @@ not exercised · ❌ does not work.
 | `.claude/` (settings.local.json, skills, plugins), `.mcp.json` (exa, context7), `.openrig/` (hooks) | ✅ | `ls -a` after launch |
 | Managed instructions go to `CLAUDE.md` by default | ✅ | appeared in the lab worktree |
 | `managed_blocks: { claude-code: CLAUDE.local.md }` redirects them | ✅ | lead and FE seats wrote `CLAUDE.local.md`, no `CLAUDE.md` |
+| One `.git/info/exclude` hides them in every worktree of that repo, not other repos | ✅ | `bin/rig-exclude` on the lab repo: worktree showed only real work files; second project unaffected; rerun keeps one block |
+| `rig-exclude` refuses when the project tracks a path OpenRig writes | ✅ | tracked `.mcp.json` → exit 2, exclude file unchanged |
+| skoolscout-com tracks none of those paths | ✅ | `git ls-files` for each path (its own `.claude/skills/*` are different names) |
 | A first launch adds the folder to `~/.claude.json`'s trusted list | ✅ | `/tmp/openrig-lab/repo` entry |
 | Your global Claude hooks run inside every seat | ✅ | `Stop says: journal · capturing` on a lab seat |
 

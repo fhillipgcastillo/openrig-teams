@@ -6,6 +6,9 @@ worktree from shared templates, so several jobs can run side by side.
 
 Built and tested against OpenRig **0.6.3**, Claude Code only (no Codex).
 
+**Setting this up with an agent?** Hand it [`AGENTS.md`](AGENTS.md): machine
+setup, onboarding a project, and running a job, each step with a check.
+
 ## The idea
 
 ```
@@ -39,6 +42,7 @@ bin/
   setup        create every machine-specific link and folder (run after clone)
   rig-home     lead / pm: plan | up | down | resume | remove
   rig-team     fe / be / devops per worktree: plan | up | down | resume | remove | name
+  rig-exclude  once per project: hide OpenRig's files in all its worktrees (.git/info/exclude)
 rigs/<team>/rig.yaml          team templates (all with managed_blocks → CLAUDE.local.md)
 rigs/<team>/CULTURE.md        link → culture/CULTURE.md, created by bin/setup (gitignored)
 agents/<dept>/<role>/         agent.yaml + guidance/role.md per seat
@@ -46,6 +50,7 @@ agents/shared                 link to OpenRig's built-in shared skills, created 
 culture/CULTURE.md            rules every seat follows
 homes/                        working folders for lead / pm (gitignored)
 docs/findings.md              what was tested, what is verified, what is not
+AGENTS.md                     step-by-step setup for an agent: machine, project, job
 ```
 
 ## One-time setup
@@ -62,6 +67,7 @@ docs/findings.md              what was tested, what is verified, what is not
 ## Daily workflow
 
 ```
+0. bin/rig-exclude <project>                  once per project (see AGENTS.md Part 2)
 1. bin/rig-home lead up                       start the lead (once; keep it running)
 2. create the job's worktree                  with the project's own tooling
 3. bin/rig-team fe <worktree> up              start only the departments the job needs
