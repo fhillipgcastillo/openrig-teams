@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# usage: rig-team <fe|be|devops> <worktree-path> [plan|up|down|resume|remove|name]
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+die() { echo "rig-team: $*" >&2; exit 1; }
+slug() { tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g'; }
+
+[ $# -ge 2 ] || die "usage: rig-team <fe|be|devops> <worktree-path> [plan|up|down|resume|remove|name]"
+team=$1
+action=${3:-up}
+template_dir="$root/rigs/$team"
+[ -f "$template_dir/rig.yaml" ] || die "no team template at rigs/$team (have: $(ls "$root/rigs" | tr '\n' ' '))"
+case "$team" in lead|pm) die "'$team' is not per-worktree; use bin/rig-home $team" ;; esac
+
+worktree=$(realpath "$2")
+git -C "$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$worktree is not a git worktree"
+git_dir=$(git -C "$worktree" rev-parse --path-format=absolute --git-dir)
+common_dir=$(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir)
+[ "$git_dir" != "$common_dir" ] || die "$worktree is the main checkout; teams only run in linked worktrees"
+
+project=$(basename "$(dirname "$common_dir")" | slug)
+job=$(basename "$worktree" | slug)
+name="$team-$project-$job"
+spec="$template_dir/rig.$project-$job.yaml"
+
+write_spec() { sed -E "s/^name:.*/name: $name/" "$template_dir/rig.yaml" > "$spec"; }
+
+case "$action" in
+  name)   echo "$name" ;;
+  plan)   write_spec; rig up "$spec" --cwd "$worktree" --plan ;;
+  up)     write_spec; rig up "$spec" --cwd "$worktree" --yes ;;
+  down)   rig down "$name" --snapshot ;;
+  resume) rig up "$name" --existing ;;
+  remove) rig down "$name" --delete --force; rm -f "$spec" ;;
+  *)      die "unknown action '$action'" ;;
+esac
+
+[ "$action" = name ] || echo "team: $name  worktree: $worktree"

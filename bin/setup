@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# usage: setup
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+die() { echo "setup: $*" >&2; exit 1; }
+
+command -v rig >/dev/null 2>&1 || die "rig not on PATH (npm install -g @openrig/cli)"
+
+openrig_package_root() {
+  local bin
+  bin=$(readlink -f "$(command -v rig)")
+  local dir
+  dir=$(dirname "$bin")
+  while [ "$dir" != "/" ]; do
+    [ -d "$dir/daemon/specs/agents/shared" ] && { echo "$dir"; return; }
+    dir=$(dirname "$dir")
+  done
+  command -v npm >/dev/null 2>&1 && [ -d "$(npm root -g)/@openrig/cli" ] && { echo "$(npm root -g)/@openrig/cli"; return; }
+  return 1
+}
+
+package=$(openrig_package_root) || die "cannot locate the OpenRig package from $(command -v rig)"
+shared="$package/daemon/specs/agents/shared"
+
+ln -sfn "$shared" "$root/agents/shared"
+for rig_dir in "$root"/rigs/*/; do
+  ln -sfn ../../culture/CULTURE.md "$rig_dir/CULTURE.md"
+done
+mkdir -p "$root/homes/lead" "$root/homes/pm"
+
+echo "agents/shared -> $shared"
+echo "rigs/*/CULTURE.md -> culture/CULTURE.md"
+echo "rig $(rig --version)"

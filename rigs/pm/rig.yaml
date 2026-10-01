@@ -1,0 +1,19 @@
+version: "0.2"
+name: pm
+summary: >
+  Optional PM seat: organizes requests into scoped jobs for the lead.
+culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
+
+pods:
+  - id: plan
+    label: Planning
+    members:
+      - id: pm
+        agent_ref: "local:../../agents/pm/planner"
+        runtime: claude-code
+        profile: default
+        cwd: "."
+
+edges: []

@@ -1,0 +1,36 @@
+version: "0.2"
+name: be
+summary: >
+  BE department template, generated per worktree by bin/rig-team: builder, reviewer, tester.
+culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
+
+pods:
+  - id: team
+    label: BE team
+    members:
+      - id: builder
+        agent_ref: "local:../../agents/be/builder"
+        runtime: claude-code
+        profile: default
+        cwd: "."
+      - id: reviewer
+        agent_ref: "local:../../agents/be/reviewer"
+        runtime: claude-code
+        profile: default
+        cwd: "."
+      - id: tester
+        agent_ref: "local:../../agents/be/tester"
+        runtime: claude-code
+        profile: default
+        cwd: "."
+    edges:
+      - kind: delegates_to
+        from: builder
+        to: reviewer
+      - kind: delegates_to
+        from: builder
+        to: tester
+
+edges: []

@@ -1,0 +1,19 @@
+version: "0.2"
+name: devops
+summary: >
+  DevOps department template, generated per worktree by bin/rig-team: one operator.
+culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
+
+pods:
+  - id: team
+    label: DevOps
+    members:
+      - id: operator
+        agent_ref: "local:../../agents/devops/operator"
+        runtime: claude-code
+        profile: default
+        cwd: "."
+
+edges: []

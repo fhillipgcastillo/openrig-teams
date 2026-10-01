@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# usage: rig-home <lead|pm> [plan|up|down|resume|remove]
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+die() { echo "rig-home: $*" >&2; exit 1; }
+
+[ $# -ge 1 ] || die "usage: rig-home <lead|pm> [plan|up|down|resume|remove]"
+rig_name=$1
+action=${2:-up}
+case "$rig_name" in lead|pm) ;; *) die "'$rig_name' is per-worktree; use bin/rig-team" ;; esac
+
+spec="$root/rigs/$rig_name/rig.yaml"
+home="$root/homes/$rig_name"
+mkdir -p "$home"
+
+case "$action" in
+  plan)   rig up "$spec" --cwd "$home" --plan ;;
+  up)     rig up "$spec" --cwd "$home" --yes ;;
+  down)   rig down "$rig_name" --snapshot ;;
+  resume) rig up "$rig_name" --existing ;;
+  remove) rig down "$rig_name" --delete --force ;;
+  *)      die "unknown action '$action'" ;;
+esac
