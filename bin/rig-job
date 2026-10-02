@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# usage: rig-job start <project> <job> [--teams fe,be] [--branch B] [--base B] [--repo PATH] [--brief TEXT] [--plan]
+#        rig-job finish <project> <job> [--teams fe,be] [--repo PATH] [--worktree] [--plan]
+#        rig-job can-spawn | profile-init <project> | doctor <project> [--repo PATH]
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+config_dir=${OPENRIG_TEAMS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/openrig-teams}
+
+PLAN=0
+LEAD_MAY_SPAWN=0
+
+die() { echo "rig-job: $*" >&2; exit 1; }
+say() { echo "rig-job: $*"; }
+run() {
+  if [ "$PLAN" = 1 ]; then printf '  would run:'; printf ' %q' "$@"; echo; else "$@"; fi
+}
+
+load_config() {
+  [ -f "$config_dir/config.env" ] && . "$config_dir/config.env"
+  return 0
+}
+
+caller_may_spawn() {
+  local seat=${OPENRIG_SESSION_NAME:-}
+  [ -z "$seat" ] && return 0
+  case "$seat" in
+    control-lead@*) [ "$LEAD_MAY_SPAWN" = 1 ] ;;
+    *) return 1 ;;
+  esac
+}
+
+guard_caller() {
+  [ "$PLAN" = 1 ] && return 0
+  caller_may_spawn && return 0
+  die "seat ${OPENRIG_SESSION_NAME:-?} may not start or finish jobs. Ask the human; only the lead can be allowed, with LEAD_MAY_SPAWN=1 in $config_dir/config.env"
+}
+
+default_create_worktree() {
+  WORKTREE="$(dirname "$PROJECT_PATH")/$(basename "$PROJECT_PATH")-worktrees/$JOB"
+  run git -C "$PROJECT_PATH" worktree add "$WORKTREE" "$BRANCH"
+}
+
+default_remove_worktree() {
+  run git -C "$PROJECT_PATH" worktree remove "$WORKTREE"
+}
+
+load_profile() {
+  local project=$1 repo=${2:-}
+  PROJECT_PATH=""; BASE_BRANCH=""; DEFAULT_TEAMS=fe; COPY_FILES=()
+  local profile="$config_dir/projects/$project.sh"
+  HAVE_PROFILE=0
+  if [ -f "$profile" ]; then HAVE_PROFILE=1; . "$profile"; fi
+  [ -n "$repo" ] && PROJECT_PATH=$repo
+  [ -n "$PROJECT_PATH" ] || die "no profile at $profile and no --repo given"
+  PROJECT_PATH=$(cd "$PROJECT_PATH" 2>/dev/null && pwd -P) || die "project path does not exist: $PROJECT_PATH"
+  git -C "$PROJECT_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$PROJECT_PATH is not a git repository"
+  [ "$(git -C "$PROJECT_PATH" rev-parse --path-format=absolute --git-dir)" = "$(git -C "$PROJECT_PATH" rev-parse --path-format=absolute --git-common-dir)" ] \
+    || die "$PROJECT_PATH is a linked worktree; give the main checkout"
+  [ -n "$BASE_BRANCH" ] || BASE_BRANCH=$(git -C "$PROJECT_PATH" symbolic-ref --short HEAD)
+}
+
+find_worktree() {
+  local job=$1 path found=() base
+  while read -r path; do
+    base=$(basename "$path")
+    if [ "$base" = "$job" ] || [[ "$base" =~ ^slot-[0-9]+-$job$ ]]; then found+=("$path"); fi
+  done < <(git -C "$PROJECT_PATH" worktree list --porcelain | sed -n 's/^worktree //p')
+  [ ${#found[@]} -eq 1 ] || die "expected one worktree for job '$job', found ${#found[@]}"
+  WORKTREE=${found[0]}
+}
+
+copy_untracked() {
+  local rel
+  for rel in ${COPY_FILES[@]+"${COPY_FILES[@]}"}; do
+    if [ -e "$WORKTREE/$rel" ]; then say "skip   $rel (present)"
+    elif [ ! -e "$PROJECT_PATH/$rel" ]; then say "MISS   $rel (not in the main checkout)"
+    else run mkdir -p "$(dirname "$WORKTREE/$rel")"; run cp -R "$PROJECT_PATH/$rel" "$WORKTREE/$rel"; say "copy   $rel"
+    fi
+  done
+}
+
+parse_options() {
+  TEAMS=""; BRANCH=""; BASE=""; REPO=""; BRIEF=""; REMOVE_WORKTREE=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --teams) TEAMS=$2; shift 2 ;;
+      --branch) BRANCH=$2; shift 2 ;;
+      --base) BASE=$2; shift 2 ;;
+      --repo) REPO=$2; shift 2 ;;
+      --brief) BRIEF=$2; shift 2 ;;
+      --worktree) REMOVE_WORKTREE=1; shift ;;
+      --plan) PLAN=1; shift ;;
+      *) die "unknown option $1" ;;
+    esac
+  done
+}
+
+cmd_start() {
+  [ $# -ge 2 ] || die "usage: rig-job start <project> <job> [options]"
+  local project=$1 job=$2; shift 2
+  parse_options "$@"
+  guard_caller
+  JOB=$(printf '%s' "$job" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+  load_profile "$project" "$REPO"
+  [ -n "$BASE" ] && BASE_BRANCH=$BASE
+  BRANCH=${BRANCH:-feature/$JOB}
+  TEAMS=${TEAMS:-$DEFAULT_TEAMS}
+
+  say "project $project ($PROJECT_PATH) $([ "$HAVE_PROFILE" = 1 ] && echo "profile: yes" || echo "profile: none, plain git")"
+  say "job $JOB  branch $BRANCH (from $BASE_BRANCH)  teams $TEAMS"
+
+  if git -C "$PROJECT_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then say "branch $BRANCH exists, reusing it"
+  else run git -C "$PROJECT_PATH" branch "$BRANCH" "$BASE_BRANCH"; fi
+
+  if declare -F profile_create_worktree >/dev/null; then profile_create_worktree; else default_create_worktree; fi
+  [ -n "${WORKTREE:-}" ] || die "creating the worktree did not set WORKTREE"
+  say "worktree $WORKTREE"
+
+  copy_untracked
+  declare -F profile_prepare_worktree >/dev/null && profile_prepare_worktree
+  run "$root/bin/rig-exclude" "$PROJECT_PATH"
+
+  local team
+  for team in ${TEAMS//,/ }; do run "$root/bin/rig-team" "$team" "$WORKTREE" up; done
+
+  if [ -n "$BRIEF" ]; then
+    run rig send control-lead@lead "Job $JOB on project $project. Worktree: $WORKTREE. Teams running: $TEAMS. $BRIEF"
+  fi
+  say "started. Stop later with: rig-job finish $project $JOB --teams $TEAMS"
+}
+
+cmd_finish() {
+  [ $# -ge 2 ] || die "usage: rig-job finish <project> <job> [options]"
+  local project=$1 job=$2; shift 2
+  parse_options "$@"
+  guard_caller
+  JOB=$(printf '%s' "$job" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+  load_profile "$project" "$REPO"
+  TEAMS=${TEAMS:-$DEFAULT_TEAMS}
+  find_worktree "$JOB"
+  say "worktree $WORKTREE"
+
+  local team
+  for team in ${TEAMS//,/ }; do run "$root/bin/rig-team" "$team" "$WORKTREE" remove || say "team $team was not running"; done
+
+  if [ "$REMOVE_WORKTREE" = 1 ]; then
+    if declare -F profile_remove_worktree >/dev/null; then profile_remove_worktree; else default_remove_worktree; fi
+  else
+    say "worktree kept. Add --worktree to remove it after the branch is merged or abandoned"
+  fi
+}
+
+cmd_can_spawn() {
+  load_config
+  if caller_may_spawn; then echo yes; else echo "no (set LEAD_MAY_SPAWN=1 in $config_dir/config.env to allow the lead)"; exit 1; fi
+}
+
+cmd_profile_init() {
+  [ $# -eq 1 ] || die "usage: rig-job profile-init <project>"
+  local target="$config_dir/projects/$1.sh"
+  [ ! -e "$target" ] || die "$target already exists"
+  mkdir -p "$config_dir/projects"
+  cp "$root/profiles/_template.sh" "$target"
+  say "created $target; fill it in (see docs/project-profile.md)"
+}
+
+cmd_doctor() {
+  [ $# -ge 1 ] || die "usage: rig-job doctor <project> [--repo PATH]"
+  local project=$1; shift
+  parse_options "$@"
+  load_profile "$project" "$REPO"
+  say "config dir: $config_dir"
+  say "LEAD_MAY_SPAWN=$LEAD_MAY_SPAWN"
+  say "profile: $([ "$HAVE_PROFILE" = 1 ] && echo "$config_dir/projects/$project.sh" || echo none)"
+  say "project path: $PROJECT_PATH   base branch: $BASE_BRANCH   default teams: $DEFAULT_TEAMS"
+  say "copy list: ${COPY_FILES[*]:-(none)}"
+  local hook
+  for hook in profile_create_worktree profile_prepare_worktree profile_remove_worktree; do
+    say "$hook: $(declare -F "$hook" >/dev/null && echo defined || echo "default")"
+  done
+  local rel
+  for rel in ${COPY_FILES[@]+"${COPY_FILES[@]}"}; do [ -e "$PROJECT_PATH/$rel" ] || say "WARN copy source missing: $rel"; done
+  "$root/bin/rig-exclude" "$PROJECT_PATH" >/dev/null 2>&1 && say "rig-exclude: ok" || say "WARN rig-exclude refused: the project tracks paths OpenRig writes"
+}
+
+[ $# -ge 1 ] || die "usage: rig-job <start|finish|can-spawn|profile-init|doctor> ..."
+action=$1; shift
+load_config
+case "$action" in
+  start) cmd_start "$@" ;;
+  finish) cmd_finish "$@" ;;
+  can-spawn) cmd_can_spawn ;;
+  profile-init) cmd_profile_init "$@" ;;
+  doctor) cmd_doctor "$@" ;;
+  *) die "unknown action '$action'" ;;
+esac

@@ -57,6 +57,18 @@ not exercised · ❌ does not work.
 | ~310 MB per `claude` process, ~660 MB with its MCP children | ✅ | RSS of three running seats |
 | A skoolscout worktree is ~215 MB source; `node_modules` hardlinked | ✅ | `du` on an existing worktree |
 
+## rig-job (2026-10-02)
+
+| Claim | Status | Evidence |
+|---|---|---|
+| `start` creates branch + worktree, copies `COPY_FILES`, excludes OpenRig files, starts the team; `finish` stops it | ✅ | lab run: `fe-repo-job-z`, `private.md` copied, missing source reported as MISS, team removed |
+| `finish --worktree` refuses a worktree holding untracked files (plain git) | ✅ | `contains modified or untracked files, use --force` |
+| Seats carry `OPENRIG_SESSION_NAME`, which the script uses to identify the caller | ✅ | read from the running builder's process environment |
+| `LEAD_MAY_SPAWN=0` refuses the lead; `1` allows the lead; builders always refused; `--plan` is allowed for anyone | ✅ | simulated with the variable set, all four cases |
+| A seat can run `../../bin/rig-job` without a prompt | ⚠ | not tried; the `Bash(rig:*)` rule does not cover it |
+| skoolscout-com profile (`--plan` on the real repo) prints the expected slot, hardlink and link steps | ✅ | read-only preview |
+| skoolscout-com profile run for real (slot claim, `git worktree add`, links) | ⚠ | not run; it mutates the human's repo and slot locks |
+
 ## Not exercised
 
 - `rig-team … down` → `resume` cycle (`rig down --snapshot`, `rig up <name> --existing`).

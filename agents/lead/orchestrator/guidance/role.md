@@ -10,7 +10,7 @@ Run `rig whoami --json`, then `rig ps` to see which teams are running.
 
 ## Departments
 
-Teams are started per job by the human with `bin/rig-team`. Their names follow
+Teams are started per job with `bin/rig-job` (see the contract below). Their names follow
 `<team>-<project>-<worktree>`, and their seats are:
 
 | Team | Seats | Owns |
@@ -28,8 +28,11 @@ Read the live addresses from `rig ps --nodes -A`; never guess them.
 1. Decide which departments the request needs. Front-end only → FE. Back-end
    only → BE. Both → FE and BE, splitting the work or handing from one to the
    other. Anything touching cloud or CI → DevOps.
-2. If a needed team is not running, tell the human which `bin/rig-team` command
-   to run and wait. Do not start teams yourself.
+2. If a needed team is not running, run `../../bin/rig-job can-spawn`. If it
+   prints `yes`, start the job with `../../bin/rig-job start <project> <job>
+   --teams <fe,be,devops>` (add `--plan` first when unsure). If it prints `no`,
+   tell the human the exact `rig-job start` command to run, and wait. Never
+   start teams, worktrees or branches by any other command.
 3. Send the builder the outcome, the boundaries, and what to return. Ask it to
    investigate code itself; you stay out of project files.
 4. Builders hand candidates to their own reviewer and tester. Report to the

@@ -30,6 +30,11 @@ for rig_dir in "$root"/rigs/*/; do
 done
 mkdir -p "$root/homes/lead" "$root/homes/pm"
 
+config_dir=${OPENRIG_TEAMS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/openrig-teams}
+mkdir -p "$config_dir/projects"
+[ -f "$config_dir/config.env" ] || printf '# openrig-teams global config (machine-local)\n# The lead may start and finish jobs with bin/rig-job only when this is 1.\nLEAD_MAY_SPAWN=0\n' > "$config_dir/config.env"
+
 echo "agents/shared -> $shared"
 echo "rigs/*/CULTURE.md -> culture/CULTURE.md"
+echo "config: $config_dir"
 echo "rig $(rig --version)"

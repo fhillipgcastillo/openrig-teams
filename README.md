@@ -42,6 +42,7 @@ bin/
   setup        create every machine-specific link and folder (run after clone)
   rig-home     lead / pm: plan | up | down | resume | remove
   rig-team     fe / be / devops per worktree: plan | up | down | resume | remove | name
+  rig-job      start | finish | can-spawn | profile-init | doctor — the one entry point for jobs
   rig-exclude  once per project: hide OpenRig's files in all its worktrees (.git/info/exclude)
 rigs/<team>/rig.yaml          team templates (all with managed_blocks → CLAUDE.local.md)
 rigs/<team>/CULTURE.md        link → culture/CULTURE.md, created by bin/setup (gitignored)
@@ -51,6 +52,8 @@ culture/CULTURE.md            rules every seat follows
 homes/                        working folders for lead / pm (gitignored)
 docs/findings.md              what was tested, what is verified, what is not
 AGENTS.md                     step-by-step setup for an agent: machine, project, job
+docs/project-profile.md       what a project profile has to decide
+profiles/_template.sh         starting point for a profile
 ```
 
 ## One-time setup
@@ -69,16 +72,39 @@ AGENTS.md                     step-by-step setup for an agent: machine, project,
 ```
 0. bin/rig-exclude <project>                  once per project (see AGENTS.md Part 2)
 1. bin/rig-home lead up                       start the lead (once; keep it running)
-2. create the job's worktree                  with the project's own tooling
-3. bin/rig-team fe <worktree> up              start only the departments the job needs
-   bin/rig-team be <worktree> up              (full-stack: both on the same worktree)
-4. rig send control-lead@lead "<the job>"     the lead dispatches through the queue
-5. review the branch and merge it yourself
-6. bin/rig-team fe <worktree> remove          stop + delete the job's team(s)
-   remove the worktree
+2. bin/rig-job start <project> <job> --teams fe[,be,devops] [--plan] [--brief "<job>"]
+                                              branch + worktree + untracked files + teams
+3. rig send control-lead@lead "<the job>"     (or use --brief above)
+4. review the branch and merge it yourself
+5. bin/rig-job finish <project> <job> --teams fe [--worktree]
 ```
 
+`rig-job` is the one entry point for both you and any agent, so the steps are
+never assembled by hand. By hand, the same thing is: project tooling for the
+branch and worktree, `bin/rig-exclude`, then `bin/rig-team <team> <worktree> up`.
+
 `rig tui` shows everything; `rig ps --nodes -A` lists every seat address.
+
+### Config and project profiles (outside this repo)
+
+`~/.config/openrig-teams/` (created by `bin/setup`) is machine-local and never
+tracked:
+
+```
+config.env                  LEAD_MAY_SPAWN=0   the lead may run rig-job only when 1
+projects/<project>.sh       how that project creates and prepares a worktree
+```
+
+A profile holds the project's path and base branch, the untracked files to copy
+into each worktree (`COPY_FILES`), and optional hooks to create, prepare and
+remove the worktree. `bin/rig-job profile-init <project>` starts one from
+`profiles/_template.sh`; `docs/project-profile.md` lists what to decide;
+`bin/rig-job doctor <project>` checks it. Without a profile, `--repo <path>`
+uses plain git.
+
+`LEAD_MAY_SPAWN` is enforced by the script, which reads the calling seat's
+`OPENRIG_SESSION_NAME`: with 0 the lead is refused; builders, reviewers and
+testers are always refused; a human shell has no such variable and is allowed.
 
 ### Names
 

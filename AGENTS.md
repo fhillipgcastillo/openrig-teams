@@ -39,7 +39,8 @@ Paths below are relative to this repository's root unless stated.
    ```sh
    bin/setup
    ```
-   Check: it prints `agents/shared -> …/daemon/specs/agents/shared` and the
+   Check: it prints `agents/shared -> …/daemon/specs/agents/shared`, the config
+   folder (`~/.config/openrig-teams`, with `config.env` and `projects/`) and the
    `rig` version. Rerun after upgrading OpenRig or switching Node versions.
 6. **Start the lead.**
    ```sh
@@ -71,48 +72,50 @@ doing.
    **tracks** some of those paths, which an exclude cannot hide and OpenRig
    would overwrite; nothing was written, the paths are listed, and you
    **ask** the human before starting any team on this project.
-2. **Learn the project's rules for new checkouts.** Read the project's
+2. **Write the project's profile** (skip when plain git is enough). Read the
+   project's
    `CLAUDE.md` / `AGENTS.md` / `README` / `CONTRIBUTING` for: how worktrees
    are created, how dependencies get into a new checkout, which env files are
-   needed, and how to run servers or tests in isolation (own ports). Part 3
-   uses these answers.
+   needed, and how to run servers or tests in isolation (own ports). Put the answers in the
+   profile (`docs/project-profile.md` lists what to decide); Part 3 uses it.
 
 ## Part 3 — A job (per job)
 
-One job = one worktree = one branch. Teams never run in the project's main
-checkout (`bin/rig-team` refuses it).
+One job = one worktree = one branch. Use **`bin/rig-job`**; do not assemble the
+raw git and rig steps yourself. It creates the branch and worktree (through the
+project's profile when there is one), copies the untracked files the profile
+lists, runs `rig-exclude`, and starts the teams.
 
-1. **Create the worktree.**
-   - If the project has its own worktree tooling (a `make` target, a script, a
-     skill named in its `CLAUDE.md`), use it. Example, skoolscout-com:
-     `make worktree-new SLOT=auto NAME=<job> BRANCH=<branch>`.
-   - Otherwise, plain git, outside the project folder:
-     ```sh
-     git -C <project> worktree add ../<project>-worktrees/<job> -b <branch> <base-branch>
-     ```
-   The worktree's folder name becomes part of the team name, so use a short job
-   slug.
-2. **Make the worktree runnable** the way the project says: install or link
-   dependencies, copy or link gitignored env files. A fresh worktree has none of
-   the main checkout's untracked files.
-3. **Start only the departments the job needs.**
+1. **Preview.**
    ```sh
-   bin/rig-team fe <worktree> plan    # must print: Status: planned
-   bin/rig-team fe <worktree> up      # and/or be, devops
+   bin/rig-job start <project> <job> --teams fe --plan
    ```
-   Check: `rig ps --nodes -A` lists `team-builder@fe-<project>-<job>` and its
-   reviewer and tester.
-4. **Hand the job to the lead.**
+   Read it. `<project>` is the profile name (`~/.config/openrig-teams/projects/`);
+   with no profile add `--repo <path-to-main-checkout>`. Check a profile with
+   `bin/rig-job doctor <project>`; create one with `bin/rig-job profile-init
+   <project>` and fill it using `docs/project-profile.md`.
+2. **Start.** Same command without `--plan`. Add `--brief "<what to do>"` to
+   also message the lead. Check: `rig ps --nodes -A` lists
+   `team-builder@fe-<project>-<job>` with its reviewer and tester.
+3. **Hand the job to the lead** if you did not use `--brief`:
    ```sh
    rig send control-lead@lead "<the job, the worktree path, what done means>"
    ```
-5. **Finish.** The human reviews and merges the branch. Then:
+4. **Finish** once the human has merged or abandoned the branch:
    ```sh
-   bin/rig-team fe <worktree> remove
+   bin/rig-job finish <project> <job> --teams fe             # stop the teams
+   bin/rig-job finish <project> <job> --teams fe --worktree  # and remove the worktree
    ```
-   Remove the worktree with the project's tooling or `git worktree remove
-   <worktree>`, only after the human confirms the branch is merged or
-   abandoned.
+   Removing the worktree is only with `--worktree`, and only after the human
+   confirms.
+
+Who may run it: the human, or any agent they ask. The lead may run it only when
+`bin/rig-job can-spawn` prints `yes`, which needs `LEAD_MAY_SPAWN=1` in
+`~/.config/openrig-teams/config.env` (default 0). No other seat can.
+
+Manual route, the same steps by hand: create the branch and worktree with the
+project's own tooling, make it runnable, `bin/rig-exclude <project>`, then
+`bin/rig-team <fe|be|devops> <worktree> up`.
 
 ## Rules while setting up
 

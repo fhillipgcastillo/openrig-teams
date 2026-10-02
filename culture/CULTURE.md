@@ -29,6 +29,9 @@ directory and take precedence for anything about the code itself.
 - Never `git commit`, `git push`, open a PR, or merge. The human does that.
 - Never create or edit release metadata: changesets, CHANGELOG entries,
   version bumps, tags, release notes. CI owns it.
+- Teams, worktrees and branches are started and stopped only through
+  `bin/rig-job`, and only by the human, or by the lead when `rig-job can-spawn`
+  prints `yes`. No other seat ever runs it.
 - Never start, stop or reset the human's own running services or databases.
   If something you need is down, report it to the lead and wait.
 - Only run a stack or end-to-end tests when the assignment says so, and only
