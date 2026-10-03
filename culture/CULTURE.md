@@ -1,7 +1,7 @@
 # Culture — how every seat in these teams works
 
 These rules apply to every rig in this repository. Project rules (code style,
-tests, tooling) come from the project's own `CLAUDE.md` in the seat's working
+tests, tooling) come from the project's own `AGENTS.md` in the seat's working
 directory and take precedence for anything about the code itself.
 
 ## Who talks to whom

@@ -6,6 +6,25 @@ until it passes. The human owns every decision marked **ask**.
 
 Paths below are relative to this repository's root unless stated.
 
+## Codex-only setup (takes precedence over the Claude machine steps below)
+
+- Use Codex CLI for every seat; do not install or configure Claude Code.
+- OpenRig 0.6.4's bare `rig setup` installs Claude automatically. Follow
+  `docs/codex-setup.md` instead: verify Codex authentication, back up its config,
+  run `bin/setup`, preview the lead, and launch it after the preview passes.
+- Codex writes `AGENTS.md`, `.agents/skills/<skill>/`, `.codex/plugins/` and
+  `.openrig/` in worktrees. `bin/rig-exclude` covers the installed role paths.
+- Project profiles must preserve project instructions in `AGENTS.md` before
+  launch. For `job-radar`, copy its tracked `CLAUDE.md` into the new worktree's
+  `AGENTS.md`; keep the main checkout unchanged.
+- The human selected Codex auto-review for these team templates. `bin/setup`
+  installs `profiles/openrig-auto.config.toml` in the active Codex home; every
+  member selects `codex_config_profile: openrig-auto`. Preserve stricter native
+  and managed settings. Existing seats need a later restart/resume to use it.
+- This choice does not grant the lead authority to approve another seat's
+  prompts, enable full bypass, or enable job spawning. Adding broad command
+  allowances still requires a separately scoped human choice.
+
 ## Part 1 — Machine (once per machine)
 
 1. **Prerequisites.** OpenRig supports macOS and Linux (WSL2 works but is

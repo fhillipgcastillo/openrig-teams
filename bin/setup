@@ -21,6 +21,15 @@ openrig_package_root() {
   return 1
 }
 
+codex_profile_dir=${CODEX_HOME:-$HOME/.codex}
+codex_profile="$codex_profile_dir/openrig-auto.config.toml"
+if [ -e "$codex_profile" ]; then
+  cmp -s "$root/profiles/openrig-auto.config.toml" "$codex_profile" || die "existing Codex profile differs: $codex_profile; preserve it and resolve the difference before setup"
+else
+  mkdir -p "$codex_profile_dir"
+  cp "$root/profiles/openrig-auto.config.toml" "$codex_profile"
+fi
+
 package=$(openrig_package_root) || die "cannot locate the OpenRig package from $(command -v rig)"
 shared="$package/daemon/specs/agents/shared"
 
@@ -37,4 +46,5 @@ mkdir -p "$config_dir/projects"
 echo "agents/shared -> $shared"
 echo "rigs/*/CULTURE.md -> culture/CULTURE.md"
 echo "config: $config_dir"
+echo "Codex auto-review profile: $codex_profile"
 echo "rig $(rig --version)"

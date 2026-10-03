@@ -19,8 +19,8 @@ skills=$(grep -ho 'skills: \[[^]]*\]' "$root"/agents/*/*/agent.yaml \
 
 block() {
   echo "$begin"
-  printf '%s\n' CLAUDE.local.md .mcp.json .openrig/ .claude/settings.local.json ".claude/plugins/shared:openrig-core/"
-  for skill in $skills; do echo ".claude/skills/$skill/"; done
+  printf '%s\n' AGENTS.md CLAUDE.local.md .mcp.json .openrig/ .claude/settings.local.json ".claude/plugins/shared:openrig-core/" ".codex/plugins/shared:openrig-core/"
+  for skill in $skills; do echo ".claude/skills/$skill/"; echo ".agents/skills/$skill/"; done
   echo "$end"
 }
 

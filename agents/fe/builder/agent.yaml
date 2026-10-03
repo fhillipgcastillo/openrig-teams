@@ -3,7 +3,7 @@ version: "1.0"
 description: "FE builder: implements the assigned job in its worktree"
 
 defaults:
-  runtime: claude-code
+  runtime: codex
 
 imports:
   - ref: local:../../shared
@@ -15,7 +15,7 @@ profiles:
       guidance: []
       subagents: []
       plugins: [shared:openrig-core]
-      runtime_resources: [shared:claude-default-settings, shared:claude-default-mcp, shared:codex-default-config, shared:claude-activity-hooks]
+      runtime_resources: [shared:codex-default-config]
 
 resources:
   guidance:

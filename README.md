@@ -4,7 +4,7 @@ Department teams for [OpenRig](https://openrig.dev), reusable across projects.
 One lead talks to you; department teams (FE, BE, DevOps) are generated per git
 worktree from shared templates, so several jobs can run side by side.
 
-Built and tested against OpenRig **0.6.3**, Claude Code only (no Codex).
+Configured for OpenRig **0.6.4** and **Codex CLI**. See [Codex setup](docs/codex-setup.md) for machine setup and the `job-radar` profile.
 
 **Setting this up with an agent?** Hand it [`AGENTS.md`](AGENTS.md): machine
 setup, onboarding a project, and running a job, each step with a check.
@@ -31,7 +31,7 @@ setup, onboarding a project, and running a job, each step with a check.
 - **The lead never writes and never reads project folders.** It delegates and
   reports. It lives in `homes/lead`, so one lead serves every project.
 - **Project rules come from the project.** Seats start inside the worktree, so
-  they load that repo's `CLAUDE.md` and skills. The templates hold only roles.
+  they load that repo's `AGENTS.md` and skills. The templates hold only roles.
 - **You merge.** No seat commits, pushes, opens PRs or touches release metadata
   (see `culture/CULTURE.md`).
 
@@ -44,7 +44,7 @@ bin/
   rig-team     fe / be / devops per worktree: plan | up | down | resume | remove | name
   rig-job      start | finish | can-spawn | profile-init | doctor — the one entry point for jobs
   rig-exclude  once per project: hide OpenRig's files in all its worktrees (.git/info/exclude)
-rigs/<team>/rig.yaml          team templates (all with managed_blocks → CLAUDE.local.md)
+rigs/<team>/rig.yaml          team templates (Codex managed instructions → AGENTS.md)
 rigs/<team>/CULTURE.md        link → culture/CULTURE.md, created by bin/setup (gitignored)
 agents/<dept>/<role>/         agent.yaml + guidance/role.md per seat
 agents/shared                 link to OpenRig's built-in shared skills, created by bin/setup (gitignored)
@@ -58,12 +58,10 @@ profiles/_template.sh         starting point for a profile
 
 ## One-time setup
 
-1. `npm install -g @openrig/cli` and `rig setup` (back up `~/.claude.json`,
-   `~/.claude/settings.json` and `~/.tmux.conf` first).
-2. Allow `rig` commands without prompts, in `~/.claude/settings.json`:
-   ```json
-   "permissions": { "allow": ["Bash(rig:*)"] }
-   ```
+1. Install `@openrig/cli`, and verify `codex login status` and `tmux -V`.
+   Do not run bare `rig setup`: 0.6.4 attempts to install Claude Code.
+2. Back up `~/.codex/config.toml`, then follow [Codex setup](docs/codex-setup.md).
+   Permission rules remain as configured unless the human explicitly changes them.
 3. `bin/setup` — run after every clone, and again after upgrading OpenRig or
    switching Node versions.
 
@@ -143,28 +141,33 @@ Nothing committed depends on this machine. Everything that does is created by
 |---|---|
 | `agents/shared` → OpenRig's shared skills | lives inside the global package folder, which depends on the Node manager (nvm, system, bun) and version. Setup finds it by following the `rig` binary, falling back to `npm root -g` |
 | `rigs/*/CULTURE.md` → `culture/CULTURE.md` | OpenRig requires the culture file beside `rig.yaml` (no `..` paths); git can check symlinks out as plain files on some systems |
-| `homes/lead`, `homes/pm` | per-machine working folders; OpenRig writes `CLAUDE.local.md`, `.claude/`, `.mcp.json`, `.openrig/` there |
+| `homes/lead`, `homes/pm` | per-machine working folders; OpenRig writes `AGENTS.md`, `.agents/`, `.codex/`, `.openrig/` there |
 
-Also per machine, outside this repo: `rig setup` (trust + hooks in
-`~/.claude.json`), the `Bash(rig:*)` allow rule, and Claude Code logged in.
+Also per machine, outside this repo: Codex workspace trust and activity hooks in
+`~/.codex/config.toml`, and Codex CLI logged in.
 Team files use only relative agent references (`local:../../agents/...`), and
 the scripts locate the repo from their own position, so the clone can live
 anywhere.
 
 ## Cost
 
-Each running Claude seat measured ~310 MB for `claude` itself, ~660 MB with
-its MCP servers, plus its share of your plan's usage. Lead + one FE job is 4
+The previous Claude setup measured ~310 MB per `claude` process, ~660 MB with
+its MCP servers. Codex memory use has not been measured. Each seat uses your
+plan's allowance. Lead + one FE job is 4
 seats; a full-stack job adds 3 more. Start only the departments a job needs
 and `remove` them when the branch is done.
 
-## Pending
+## Permissions
 
-- **Auto mode for every seat.** Seats launch in `acceptEdits`. The lead runs
-  prompt-free with the `Bash(rig:*)` rule, but builders and testers prompt on
-  every non-`rig` shell command (tests, lint, `git diff`, file writes via
-  shell), so teams can't run unattended yet. A team file cannot select `auto`
-  (OpenRig only accepts `floor` / `full_bypass` there); it is per seat:
-  `rig seat set-permissions <seat> --mode auto --reason "…"`, effective from
-  the seat's next launch. Untested here; once confirmed, `rig-team up` should
-  apply it to each new seat.
+Every Codex member selects `codex_config_profile: openrig-auto`. `bin/setup`
+installs `profiles/openrig-auto.config.toml` under `${CODEX_HOME:-$HOME/.codex}`
+without overwriting a differing existing profile. It retains workspace-write
+sandboxing and routes eligible approval requests through Codex auto-review.
+Existing seats keep their current settings until a later restart/resume.
+
+No full-bypass policy, lead permission broker, or broad prompt-free `rig`
+allowance is enabled. Auto-review can reject actions; effective project and
+managed settings still need to be checked. Lead spawning remains disabled.
+
+The separate approval-design discussion prompt is in
+[`docs/approval-design-session.md`](docs/approval-design-session.md).

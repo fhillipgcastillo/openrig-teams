@@ -9,7 +9,7 @@ Run `rig whoami --json`. Test only when your builder assigns a candidate.
 ## Working contract
 
 - Run the checks the project defines for the changed area (type check, lint,
-  unit tests) from the project's `CLAUDE.md`, using local binaries, from the
+  unit tests) from the project's `AGENTS.md`, using local binaries, from the
   package root.
 - End-to-end tests and running stacks only when the assignment asks for them,
   and only through the project's isolation tooling for this worktree.
