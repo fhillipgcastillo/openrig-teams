@@ -3,7 +3,7 @@
 # Sourced by bash. What to decide: docs/project-profile.md
 
 PROJECT_PATH="$HOME/path/to/main-checkout"
-BASE_BRANCH=develop
+BASE_BRANCH=main
 DEFAULT_TEAMS=fe
 COPY_FILES=()
 
