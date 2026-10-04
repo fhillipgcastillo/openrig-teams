@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+import { runtimeCommand } from '../lib/runtime-launch.mjs';
+
+try {
+  await runtimeCommand(process.argv.slice(2));
+} catch (error) {
+  console.error(`rig-runtime: ${error.message}`);
+  process.exitCode = 1;
+}

@@ -106,6 +106,10 @@ cmd_start() {
   [ -n "$BASE" ] && BASE_BRANCH=$BASE
   BRANCH=${BRANCH:-feature/$JOB}
   TEAMS=${TEAMS:-$DEFAULT_TEAMS}
+  [[ "$TEAMS" =~ ^(fe|be|devops)(,(fe|be|devops))*$ ]] || die "invalid teams: $TEAMS"
+  local selected_teams=() selected_runtime
+  IFS=, read -r -a selected_teams <<< "$TEAMS"
+  selected_runtime=$("$root/bin/rig-runtime" check "${selected_teams[@]}")
 
   say "project $project ($PROJECT_PATH) $([ "$HAVE_PROFILE" = 1 ] && echo "profile: yes" || echo "profile: none, plain git")"
   say "job $JOB  branch $BRANCH (from $BASE_BRANCH)  teams $TEAMS"
@@ -119,7 +123,7 @@ cmd_start() {
 
   copy_untracked
   declare -F profile_prepare_worktree >/dev/null && profile_prepare_worktree
-  run "$root/bin/rig-exclude" "$PROJECT_PATH"
+  run "$root/bin/rig-exclude" "$PROJECT_PATH" --runtime "$selected_runtime"
 
   local team
   for team in ${TEAMS//,/ }; do run "$root/bin/rig-team" "$team" "$WORKTREE" up; done
@@ -181,7 +185,14 @@ cmd_doctor() {
   done
   local rel
   for rel in ${COPY_FILES[@]+"${COPY_FILES[@]}"}; do [ -e "$PROJECT_PATH/$rel" ] || say "WARN copy source missing: $rel"; done
-  "$root/bin/rig-exclude" "$PROJECT_PATH" >/dev/null 2>&1 && say "rig-exclude: ok" || say "WARN rig-exclude refused: the project tracks paths OpenRig writes"
+  local selected_runtime selected_teams=()
+  TEAMS=${TEAMS:-$DEFAULT_TEAMS}
+  IFS=, read -r -a selected_teams <<< "$TEAMS"
+  if selected_runtime=$("$root/bin/rig-runtime" check "${selected_teams[@]}"); then
+    "$root/bin/rig-exclude" "$PROJECT_PATH" --runtime "$selected_runtime" >/dev/null 2>&1 && say "rig-exclude: ok ($selected_runtime)" || say "WARN rig-exclude refused: the project tracks paths OpenRig writes"
+  else
+    say "WARN runtime preflight failed; configure bin/setup before starting jobs"
+  fi
 }
 
 [ $# -ge 1 ] || die "usage: rig-job <start|finish|can-spawn|profile-init|doctor> ..."

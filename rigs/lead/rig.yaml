@@ -3,6 +3,8 @@ name: lead
 summary: >
   Project-agnostic lead: single contact for the human, delegates to department teams.
 culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
 
 pods:
   - id: control
@@ -11,7 +13,6 @@ pods:
       - id: lead
         agent_ref: "local:../../agents/lead/orchestrator"
         runtime: codex
-        codex_config_profile: openrig-auto
         profile: default
         cwd: "."
 

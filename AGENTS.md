@@ -6,84 +6,47 @@ until it passes. The human owns every decision marked **ask**.
 
 Paths below are relative to this repository's root unless stated.
 
-## Codex-only setup (takes precedence over the Claude machine steps below)
-
-- Use Codex CLI for every seat; do not install or configure Claude Code.
-- OpenRig 0.6.4's bare `rig setup` installs Claude automatically. Follow
-  `docs/codex-setup.md` instead: verify Codex authentication, back up its config,
-  run `bin/setup`, preview the lead, and launch it after the preview passes.
-- Codex writes `AGENTS.md`, `.agents/skills/<skill>/`, `.codex/plugins/` and
-  `.openrig/` in worktrees. `bin/rig-exclude` covers the installed role paths.
-- Project profiles must preserve project instructions in `AGENTS.md` before
-  launch. For `job-radar`, copy its tracked `CLAUDE.md` into the new worktree's
-  `AGENTS.md`; keep the main checkout unchanged.
-- The human selected Codex auto-review for these team templates. `bin/setup`
-  installs `profiles/openrig-auto.config.toml` in the active Codex home; every
-  member selects `codex_config_profile: openrig-auto`. Preserve stricter native
-  and managed settings. Existing seats need a later restart/resume to use it.
-- This choice does not grant the lead authority to approve another seat's
-  prompts, enable full bypass, or enable job spawning. Adding broad command
-  allowances still requires a separately scoped human choice.
+Before onboarding a project or changing runtimes/approvals, read the relevant
+entry in [lessons-learned.md](lessons-learned.md). Machine choices belong in
+local configuration; project choices belong in its profile.
 
 ## Part 1 — Machine (once per machine)
 
-1. **Prerequisites.** OpenRig supports macOS and Linux (WSL2 works but is
-   officially untested). Check:
+1. **Prerequisites.** Follow [setup](docs/setup.md) for the supported OpenRig
+   version, Node, tmux, and the selected coding CLI(s). Verify authentication
+   for each selected CLI. Never install or configure an unselected CLI.
+2. **Back up configuration.** Back up the selected harnesses' user configuration
+   before a first launch. Inspect native and managed permission settings.
+   Do not add broad permission allowlists as part of this setup.
+3. **Choose and preview local preferences.** Run `bin/setup --plan` interactively,
+   or supply the runtime and approval flags documented in [setup](docs/setup.md).
+   Check that the selected runtimes and approval modes match the human's request.
+   Apply with the same choices and no `--plan`. Setup creates links, folders,
+   and `runtime.json`; existing project profiles and spawn authorization remain.
+   Rerun after upgrading OpenRig or switching Node versions.
+4. **Preview and launch the lead.** Use the wrappers so saved preferences apply:
    ```sh
-   node --version      # 22 or 24
-   tmux -V
-   claude --version    # Claude Code installed and logged in
-   ```
-2. **Install OpenRig.**
-   ```sh
-   npm install -g @openrig/cli
-   rig --version
-   ```
-3. **Back up, preview, apply `rig setup`.** It writes workspace trust and hooks
-   into the human's harness config, with no complete rollback.
-   ```sh
-   mkdir -p ~/openrig-backup-$(date +%F)
-   cp ~/.claude.json ~/.claude/settings.json ~/.tmux.conf ~/openrig-backup-$(date +%F)/ 2>/dev/null
-   rig setup --dry-run
-   ```
-   **Ask** the human to approve the dry-run plan, then run `rig setup`.
-4. **Allow `rig` commands without prompts.** Add to `permissions.allow` in
-   `~/.claude/settings.json` (create the `permissions` key if missing; keep the
-   file valid JSON):
-   ```json
-   "permissions": { "allow": ["Bash(rig:*)"] }
-   ```
-   Check: `node -e 'console.log(require(process.env.HOME+"/.claude/settings.json").permissions)'`.
-5. **Link this repo to the installed OpenRig.**
-   ```sh
-   bin/setup
-   ```
-   Check: it prints `agents/shared -> …/daemon/specs/agents/shared`, the config
-   folder (`~/.config/openrig-teams`, with `config.env` and `projects/`) and the
-   `rig` version. Rerun after upgrading OpenRig or switching Node versions.
-6. **Start the lead.**
-   ```sh
-   bin/rig-home lead plan     # must print: Status: planned
+   bin/rig-home lead plan
    bin/rig-home lead up
    ```
-   Check: `rig ps --nodes --rig lead` shows `control-lead@lead` as `idle`, not
-   `needs-input`. If the name `lead` is already taken by another rig, **ask**
-   before stopping it.
+   Inspect the plan before launching. Check `rig ps --nodes --rig lead` for the
+   selected runtime and seat state. Claude approval preferences are saved after
+   initial launch and take effect on a subsequent launch; see [approval timing](docs/setup.md#approval-modes-and-existing-seats).
+   If an existing rig occupies `lead`, **ask** before stopping or replacing it.
 
 ## Part 2 — Project (once per project)
 
 Nothing is installed into the project. Teams start inside its worktrees and
-read the project's own `CLAUDE.md` and skills from there. Two things still need
-doing.
+load the project's instructions and skills for their selected runtimes. Two
+things still need doing.
 
-1. **Hide the files OpenRig writes into each worktree.** Every launch creates
-   `CLAUDE.local.md`, `.mcp.json`, `.openrig/`, `.claude/settings.local.json`,
-   `.claude/plugins/shared:openrig-core/` and one `.claude/skills/<skill>/` per
-   role skill. Without this step they show as untracked files on every job
-   branch.
+1. **Hide the files OpenRig writes into each worktree.** Select `codex`,
+   `claude-code`, or `both` to match the runtimes the project will use:
    ```sh
-   bin/rig-exclude <path-to-the-project>
+   bin/rig-exclude <path-to-the-project> --runtime both
    ```
+   See [generated files](docs/setup.md#project-instructions-and-generated-files)
+   for the paths per runtime. `rig-job` supplies the union for its selected teams.
    This writes a marked block into the repository's shared `.git/info/exclude`:
    local to this machine, never committed, applies to every worktree of that
    repository, and safe to rerun. It never edits the project's `.gitignore`.
@@ -97,6 +60,8 @@ doing.
    are created, how dependencies get into a new checkout, which env files are
    needed, and how to run servers or tests in isolation (own ports). Put the answers in the
    profile (`docs/project-profile.md` lists what to decide); Part 3 uses it.
+   Decide instruction bridging in that profile; never generically overwrite or
+   copy tracked `AGENTS.md` / `CLAUDE.md` files.
 
 ## Part 3 — A job (per job)
 
@@ -142,6 +107,6 @@ project's own tooling, make it runnable, `bin/rig-exclude <project>`, then
   the human asks.
 - Never start, stop or reset the human's own running services, databases or
   rigs.
-- Builders and testers prompt on every non-`rig` shell command until auto mode
-  is configured (see README → Pending). Do not answer another seat's permission
-  prompts; tell the human which seat is waiting.
+- Approval behavior follows the saved runtime/mode and native managed rules.
+  Do not answer another seat's permission prompts; tell the human which seat
+  is waiting. Auto does not grant the lead authority to approve other seats.

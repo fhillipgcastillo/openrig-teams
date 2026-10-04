@@ -1,50 +1,9 @@
-#!/usr/bin/env bash
-# usage: setup
-set -euo pipefail
+#!/usr/bin/env node
+import { setup } from '../lib/setup.mjs';
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-die() { echo "setup: $*" >&2; exit 1; }
-
-command -v rig >/dev/null 2>&1 || die "rig not on PATH (npm install -g @openrig/cli)"
-
-openrig_package_root() {
-  local bin
-  bin=$(readlink -f "$(command -v rig)")
-  local dir
-  dir=$(dirname "$bin")
-  while [ "$dir" != "/" ]; do
-    [ -d "$dir/daemon/specs/agents/shared" ] && { echo "$dir"; return; }
-    dir=$(dirname "$dir")
-  done
-  command -v npm >/dev/null 2>&1 && [ -d "$(npm root -g)/@openrig/cli" ] && { echo "$(npm root -g)/@openrig/cli"; return; }
-  return 1
+try {
+  await setup(process.argv.slice(2));
+} catch (error) {
+  console.error(`setup: ${error.message}`);
+  process.exitCode = 1;
 }
-
-codex_profile_dir=${CODEX_HOME:-$HOME/.codex}
-codex_profile="$codex_profile_dir/openrig-auto.config.toml"
-if [ -e "$codex_profile" ]; then
-  cmp -s "$root/profiles/openrig-auto.config.toml" "$codex_profile" || die "existing Codex profile differs: $codex_profile; preserve it and resolve the difference before setup"
-else
-  mkdir -p "$codex_profile_dir"
-  cp "$root/profiles/openrig-auto.config.toml" "$codex_profile"
-fi
-
-package=$(openrig_package_root) || die "cannot locate the OpenRig package from $(command -v rig)"
-shared="$package/daemon/specs/agents/shared"
-
-ln -sfn "$shared" "$root/agents/shared"
-for rig_dir in "$root"/rigs/*/; do
-  ln -sfn ../../culture/CULTURE.md "$rig_dir/CULTURE.md"
-done
-mkdir -p "$root/homes/lead" "$root/homes/pm"
-
-config_dir=${OPENRIG_TEAMS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/openrig-teams}
-mkdir -p "$config_dir/projects"
-[ -f "$config_dir/config.env" ] || printf '# openrig-teams global config (machine-local)\n# The lead may start and finish jobs with bin/rig-job only when this is 1.\nLEAD_MAY_SPAWN=0\n' > "$config_dir/config.env"
-
-echo "agents/shared -> $shared"
-echo "rigs/*/CULTURE.md -> culture/CULTURE.md"
-echo "config: $config_dir"
-echo "Codex auto-review profile: $codex_profile"
-echo "rig $(rig --version)"

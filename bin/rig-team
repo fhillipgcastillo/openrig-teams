@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# usage: rig-team <fe|be|devops> <worktree-path> [plan|up|down|resume|remove|name]
+# usage: rig-team <fe|be|devops> <worktree-path> [plan|up|down|resume|remove|permissions|name]
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -7,7 +7,7 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 die() { echo "rig-team: $*" >&2; exit 1; }
 slug() { tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g'; }
 
-[ $# -ge 2 ] || die "usage: rig-team <fe|be|devops> <worktree-path> [plan|up|down|resume|remove|name]"
+[ $# -ge 2 ] && [ $# -le 3 ] || die "usage: rig-team <fe|be|devops> <worktree-path> [plan|up|down|resume|remove|permissions|name]"
 team=$1
 action=${3:-up}
 template_dir="$root/rigs/$team"
@@ -25,15 +25,29 @@ job=$(basename "$worktree" | slug)
 name="$team-$project-$job"
 spec="$template_dir/rig.$project-$job.yaml"
 
-write_spec() { sed -E "s/^name:.*/name: $name/" "$template_dir/rig.yaml" > "$spec"; }
-
 case "$action" in
   name)   echo "$name" ;;
-  plan)   write_spec; rig up "$spec" --cwd "$worktree" --plan ;;
-  up)     write_spec; rig up "$spec" --cwd "$worktree" --yes ;;
+  plan)
+    "$root/bin/rig-runtime" check "$team" >/dev/null
+    spec="$template_dir/rig.$project-$job.plan.yaml"
+    "$root/bin/rig-runtime" render "$team" "$name" "$spec"
+    rig up "$spec" --cwd "$worktree" --plan
+    "$root/bin/rig-runtime" permissions "$team" "$name" --plan
+    ;;
+  up)
+    "$root/bin/rig-runtime" check "$team" >/dev/null
+    "$root/bin/rig-runtime" render "$team" "$name" "$spec"
+    rig up "$spec" --cwd "$worktree" --yes
+    "$root/bin/rig-runtime" permissions "$team" "$name"
+    ;;
   down)   rig down "$name" --snapshot ;;
-  resume) rig up "$name" --existing ;;
-  remove) rig down "$name" --delete --force; rm -f "$spec" ;;
+  resume)
+    "$root/bin/rig-runtime" check "$team" >/dev/null
+    "$root/bin/rig-runtime" permissions "$team" "$name"
+    rig up "$name" --existing
+    ;;
+  permissions) "$root/bin/rig-runtime" permissions "$team" "$name" ;;
+  remove) rig down "$name" --delete --force; rm -f "$spec" "$template_dir/rig.$project-$job.plan.yaml" ;;
   *)      die "unknown action '$action'" ;;
 esac
 

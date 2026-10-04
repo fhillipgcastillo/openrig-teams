@@ -3,6 +3,8 @@ name: pm
 summary: >
   Optional PM seat: organizes requests into scoped jobs for the lead.
 culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
 
 pods:
   - id: plan
@@ -11,7 +13,6 @@ pods:
       - id: pm
         agent_ref: "local:../../agents/pm/planner"
         runtime: codex
-        codex_config_profile: openrig-auto
         profile: default
         cwd: "."
 

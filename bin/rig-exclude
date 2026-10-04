@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# usage: rig-exclude <path-inside-project>
+# usage: rig-exclude <path-inside-project> [--runtime codex|claude-code|both]
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 die() { echo "rig-exclude: $*" >&2; exit 1; }
 
-[ $# -eq 1 ] || die "usage: rig-exclude <path-inside-project>"
+[ $# -eq 1 ] || [ $# -eq 3 ] || die "usage: rig-exclude <path-inside-project> [--runtime codex|claude-code|both]"
+runtime=both
+if [ $# -eq 3 ]; then
+  [ "$2" = --runtime ] || die "expected --runtime"
+  runtime=$3
+fi
+case "$runtime" in codex|claude-code|both) ;; *) die "unknown runtime '$runtime'" ;; esac
 git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$1 is not inside a git repository"
+project_root=$(git -C "$1" rev-parse --show-toplevel)
 
 common_dir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)
 exclude="$common_dir/info/exclude"
@@ -19,13 +26,20 @@ skills=$(grep -ho 'skills: \[[^]]*\]' "$root"/agents/*/*/agent.yaml \
 
 block() {
   echo "$begin"
-  printf '%s\n' AGENTS.md CLAUDE.local.md .mcp.json .openrig/ .claude/settings.local.json ".claude/plugins/shared:openrig-core/" ".codex/plugins/shared:openrig-core/"
-  for skill in $skills; do echo ".claude/skills/$skill/"; echo ".agents/skills/$skill/"; done
+  printf '%s\n' .openrig/
+  if [ "$runtime" != codex ]; then
+    printf '%s\n' CLAUDE.local.md .mcp.json .claude/settings.local.json ".claude/plugins/shared:openrig-core/"
+    for skill in $skills; do echo ".claude/skills/$skill/"; done
+  fi
+  if [ "$runtime" != claude-code ]; then
+    printf '%s\n' AGENTS.md ".codex/plugins/shared:openrig-core/"
+    for skill in $skills; do echo ".agents/skills/$skill/"; done
+  fi
   echo "$end"
 }
 
 paths=$(block | grep -v '^#')
-collisions=$(cd "$(dirname "$common_dir")" && git ls-files -- $paths)
+collisions=$(git -C "$project_root" ls-files -- $paths)
 if [ -n "$collisions" ]; then
   echo "rig-exclude: the project tracks paths OpenRig overwrites; ask the human before starting teams:" >&2
   printf '  %s\n' $collisions >&2
@@ -35,7 +49,9 @@ fi
 mkdir -p "$(dirname "$exclude")"
 touch "$exclude"
 kept=$(sed "/^$begin\$/,/^$end\$/d" "$exclude")
-{ [ -n "$kept" ] && printf '%s\n' "$kept"; block; } > "$exclude.tmp"
+previous=$(sed -n "/^$begin\$/,/^$end\$/p" "$exclude" | sed '/^#/d')
+merged=$(printf '%s\n' "$previous" "$paths" | sed '/^$/d' | sort -u)
+{ [ -n "$kept" ] && printf '%s\n' "$kept"; printf '%s\n' "$begin" "$merged" "$end"; } > "$exclude.tmp"
 mv "$exclude.tmp" "$exclude"
 
 echo "updated $exclude (applies to every worktree of $(basename "$(dirname "$common_dir")"))"

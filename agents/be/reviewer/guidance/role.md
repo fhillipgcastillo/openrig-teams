@@ -10,7 +10,7 @@ Run `rig whoami --json`. Review only when your builder assigns a candidate.
 
 - Read the exact diff in the worktree (`git diff`, `git status`) and the code
   around it.
-- Check it against the assignment and the project's `AGENTS.md` rules.
+- Check it against the assignment and the project's applicable `AGENTS.md` / `CLAUDE.md` rules.
 - Report concrete, source-backed defects with file:line and consequence. A clean
   review needs no invented findings.
 - Reply to the builder that asked.

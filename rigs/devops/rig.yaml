@@ -3,6 +3,8 @@ name: devops
 summary: >
   DevOps department template, generated per worktree by bin/rig-team: one operator.
 culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
 
 pods:
   - id: team
@@ -11,7 +13,6 @@ pods:
       - id: operator
         agent_ref: "local:../../agents/devops/operator"
         runtime: codex
-        codex_config_profile: openrig-auto
         profile: default
         cwd: "."
 

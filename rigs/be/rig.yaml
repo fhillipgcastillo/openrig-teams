@@ -3,6 +3,8 @@ name: be
 summary: >
   BE department template, generated per worktree by bin/rig-team: builder, reviewer, tester.
 culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
 
 pods:
   - id: team
@@ -11,19 +13,16 @@ pods:
       - id: builder
         agent_ref: "local:../../agents/be/builder"
         runtime: codex
-        codex_config_profile: openrig-auto
         profile: default
         cwd: "."
       - id: reviewer
         agent_ref: "local:../../agents/be/reviewer"
         runtime: codex
-        codex_config_profile: openrig-auto
         profile: default
         cwd: "."
       - id: tester
         agent_ref: "local:../../agents/be/tester"
         runtime: codex
-        codex_config_profile: openrig-auto
         profile: default
         cwd: "."
     edges:

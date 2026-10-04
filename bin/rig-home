@@ -1,25 +1,43 @@
 #!/usr/bin/env bash
-# usage: rig-home <lead|pm> [plan|up|down|resume|remove]
+# usage: rig-home <lead|pm> [plan|up|down|resume|remove|permissions|name]
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 die() { echo "rig-home: $*" >&2; exit 1; }
 
-[ $# -ge 1 ] || die "usage: rig-home <lead|pm> [plan|up|down|resume|remove]"
+[ $# -ge 1 ] && [ $# -le 2 ] || die "usage: rig-home <lead|pm> [plan|up|down|resume|remove|permissions|name]"
 rig_name=$1
 action=${2:-up}
 case "$rig_name" in lead|pm) ;; *) die "'$rig_name' is per-worktree; use bin/rig-team" ;; esac
 
-spec="$root/rigs/$rig_name/rig.yaml"
+spec="$root/rigs/$rig_name/rig.generated.yaml"
 home="$root/homes/$rig_name"
-mkdir -p "$home"
 
 case "$action" in
-  plan)   rig up "$spec" --cwd "$home" --plan ;;
-  up)     rig up "$spec" --cwd "$home" --yes ;;
+  name) echo "$rig_name" ;;
+  plan)
+    "$root/bin/rig-runtime" check "$rig_name" >/dev/null
+    spec="$root/rigs/$rig_name/rig.generated.plan.yaml"
+    "$root/bin/rig-runtime" render "$rig_name" "$rig_name" "$spec"
+    mkdir -p "$home"
+    rig up "$spec" --cwd "$home" --plan
+    "$root/bin/rig-runtime" permissions "$rig_name" "$rig_name" --plan
+    ;;
+  up)
+    "$root/bin/rig-runtime" check "$rig_name" >/dev/null
+    "$root/bin/rig-runtime" render "$rig_name" "$rig_name" "$spec"
+    mkdir -p "$home"
+    rig up "$spec" --cwd "$home" --yes
+    "$root/bin/rig-runtime" permissions "$rig_name" "$rig_name"
+    ;;
   down)   rig down "$rig_name" --snapshot ;;
-  resume) rig up "$rig_name" --existing ;;
+  resume)
+    "$root/bin/rig-runtime" check "$rig_name" >/dev/null
+    "$root/bin/rig-runtime" permissions "$rig_name" "$rig_name"
+    rig up "$rig_name" --existing
+    ;;
+  permissions) "$root/bin/rig-runtime" permissions "$rig_name" "$rig_name" ;;
   remove) rig down "$rig_name" --delete --force ;;
   *)      die "unknown action '$action'" ;;
 esac

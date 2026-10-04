@@ -1,10 +1,10 @@
 # openrig-teams
 
 Department teams for [OpenRig](https://openrig.dev), reusable across projects.
-One lead talks to you; department teams (FE, BE, DevOps) are generated per git
-worktree from shared templates, so several jobs can run side by side.
+One lead talks to you; department teams (FE, BE, DevOps) are generated per git worktree from shared templates, so several jobs can run side by side.
 
-Configured for OpenRig **0.6.4** and **Codex CLI**. See [Codex setup](docs/codex-setup.md) for machine setup and the `job-radar` profile.
+Supports **Claude Code, Codex CLI, and mixed teams** with OpenRig **0.6.4**.
+[Setup](docs/setup.md) saves your runtime and approval choices locally.
 
 **Setting this up with an agent?** Hand it [`AGENTS.md`](AGENTS.md): machine
 setup, onboarding a project, and running a job, each step with a check.
@@ -31,7 +31,8 @@ setup, onboarding a project, and running a job, each step with a check.
 - **The lead never writes and never reads project folders.** It delegates and
   reports. It lives in `homes/lead`, so one lead serves every project.
 - **Project rules come from the project.** Seats start inside the worktree, so
-  they load that repo's `AGENTS.md` and skills. The templates hold only roles.
+  they load its instructions and skills for the selected CLI. The templates hold
+  only roles; the project profile handles any instruction bridge.
 - **You merge.** No seat commits, pushes, opens PRs or touches release metadata
   (see `culture/CULTURE.md`).
 
@@ -40,11 +41,12 @@ setup, onboarding a project, and running a job, each step with a check.
 ```
 bin/
   setup        create every machine-specific link and folder (run after clone)
-  rig-home     lead / pm: plan | up | down | resume | remove
-  rig-team     fe / be / devops per worktree: plan | up | down | resume | remove | name
+  rig-home     lead / pm: plan | up | down | resume | remove | name | permissions
+  rig-team     per worktree: plan | up | down | resume | remove | name | permissions
   rig-job      start | finish | can-spawn | profile-init | doctor — the one entry point for jobs
+  rig-runtime  render saved runtime/approval choices; validate launch prerequisites
   rig-exclude  once per project: hide OpenRig's files in all its worktrees (.git/info/exclude)
-rigs/<team>/rig.yaml          team templates (Codex managed instructions → AGENTS.md)
+rigs/<team>/rig.yaml          shared team templates; wrappers render your saved runtime choices
 rigs/<team>/CULTURE.md        link → culture/CULTURE.md, created by bin/setup (gitignored)
 agents/<dept>/<role>/         agent.yaml + guidance/role.md per seat
 agents/shared                 link to OpenRig's built-in shared skills, created by bin/setup (gitignored)
@@ -52,18 +54,24 @@ culture/CULTURE.md            rules every seat follows
 homes/                        working folders for lead / pm (gitignored)
 docs/findings.md              what was tested, what is verified, what is not
 AGENTS.md                     step-by-step setup for an agent: machine, project, job
+CLAUDE.md                     imports AGENTS.md for Claude Code
+docs/setup.md                 runtime, approval, and mixed-team setup
 docs/project-profile.md       what a project profile has to decide
 profiles/_template.sh         starting point for a profile
 ```
 
 ## One-time setup
 
-1. Install `@openrig/cli`, and verify `codex login status` and `tmux -V`.
-   Do not run bare `rig setup`: 0.6.4 attempts to install Claude Code.
-2. Back up `~/.codex/config.toml`, then follow [Codex setup](docs/codex-setup.md).
-   Permission rules remain as configured unless the human explicitly changes them.
-3. `bin/setup` — run after every clone, and again after upgrading OpenRig or
-   switching Node versions.
+1. Follow [setup](docs/setup.md) to install OpenRig and authenticate your selected
+   CLI(s). Back up the selected harness configuration before first launch.
+2. Run `bin/setup --plan` to choose runtime and approval preferences, then
+   `bin/setup` with the same choices to save them. Equivalent flags support noninteractive
+   setup, including per-seat overrides for mixed teams.
+3. Preview with `bin/rig-home lead plan`, then launch with `bin/rig-home lead up`.
+   Rerun setup after upgrading OpenRig or switching Node versions.
+
+Use the wrappers to apply saved preferences. Direct launches of tracked
+`rig.yaml` templates use their Codex baseline instead.
 
 ## Daily workflow
 
@@ -86,9 +94,10 @@ branch and worktree, `bin/rig-exclude`, then `bin/rig-team <team> <worktree> up`
 ### Config and project profiles (outside this repo)
 
 `~/.config/openrig-teams/` (created by `bin/setup`) is machine-local and never
-tracked:
+tracked (`OPENRIG_TEAMS_CONFIG` or `XDG_CONFIG_HOME` can change the base):
 
 ```
+runtime.json                default runtime, per-runtime approvals, per-seat overrides
 config.env                  LEAD_MAY_SPAWN=0   the lead may run rig-job only when 1
 projects/<project>.sh       how that project creates and prepares a worktree
 ```
@@ -122,15 +131,18 @@ with same-named worktrees never collide. `rig-team` refuses a main checkout.
 
 | Action | `rig-team` / `rig-home` does |
 |---|---|
-| `plan` | write the generated spec and preview the launch |
-| `up` | write the generated spec and launch |
+| `plan` | write a separate ignored `.plan.yaml`; preview launch and deferred Claude permission steps |
+| `up` | render saved choices and launch; save Claude approval choices for the next launch |
 | `down` | stop with a snapshot (keeps the record) |
-| `resume` | relaunch a stopped team by name (`rig up <name> --existing`) |
+| `resume` | verify existing seat runtimes, apply Claude approval choices, then relaunch by name |
 | `remove` | stop, delete the record, delete the generated spec |
-| `name` | print the generated name only (`rig-team`) |
+| `name` | print the rig name only |
+| `permissions` | verify existing seat runtimes and explicitly save Claude approval preferences |
 
-`down` / `resume` are wired to OpenRig's documented verbs but were not
-exercised in testing — see `docs/findings.md`.
+Earlier live testing is recorded in [findings](docs/findings.md), with its
+original version/date and verification limits. Current automated tests use
+temporary configurations and mocked lifecycle commands; they do not prove
+native interactive approval behavior.
 
 ## Portability
 
@@ -139,12 +151,12 @@ Nothing committed depends on this machine. Everything that does is created by
 
 | Created by setup | Why it can't be committed |
 |---|---|
-| `agents/shared` → OpenRig's shared skills | lives inside the global package folder, which depends on the Node manager (nvm, system, bun) and version. Setup finds it by following the `rig` binary, falling back to `npm root -g` |
+| `agents/shared` → OpenRig's shared skills | lives inside the global package folder, which depends on the Node manager (nvm, system, bun) and version. Setup finds it by following the `rig` binary to its installed package |
 | `rigs/*/CULTURE.md` → `culture/CULTURE.md` | OpenRig requires the culture file beside `rig.yaml` (no `..` paths); git can check symlinks out as plain files on some systems |
-| `homes/lead`, `homes/pm` | per-machine working folders; OpenRig writes `AGENTS.md`, `.agents/`, `.codex/`, `.openrig/` there |
+| `homes/lead`, `homes/pm` | per-machine working folders; OpenRig writes the selected harnesses' managed instructions and resources there |
 
-Also per machine, outside this repo: Codex workspace trust and activity hooks in
-`~/.codex/config.toml`, and Codex CLI logged in.
+Also per machine, outside this repo: selected CLI authentication, native
+workspace trust and hooks, and saved runtime/approval preferences.
 Team files use only relative agent references (`local:../../agents/...`), and
 the scripts locate the repo from their own position, so the clone can live
 anywhere.
@@ -159,15 +171,22 @@ and `remove` them when the branch is done.
 
 ## Permissions
 
-Every Codex member selects `codex_config_profile: openrig-auto`. `bin/setup`
-installs `profiles/openrig-auto.config.toml` under `${CODEX_HOME:-$HOME/.codex}`
-without overwriting a differing existing profile. It retains workspace-write
-sandboxing and routes eligible approval requests through Codex auto-review.
-Existing seats keep their current settings until a later restart/resume.
+Choose `native` or `auto` per runtime, with optional seat overrides. Codex auto
+uses the optional `openrig-auto` profile; native adds no named profile. Claude
+native records `floor`; Claude auto records OpenRig's native `auto` selection.
+Native and managed rules remain in effect.
 
-No full-bypass policy, lead permission broker, or broad prompt-free `rig`
-allowance is enabled. Auto-review can reject actions; effective project and
-managed settings still need to be checked. Lead spawning remains disabled.
+Claude preferences are saved after the first launch and apply on a subsequent
+launch. `permissions` saves them explicitly; `resume` saves them before launch.
+There are no automatic restarts. Changing harnesses or Codex profiles requires
+newly generated rigs; resuming keeps those stored choices. Existing Claude
+seats can change approval mode through `permissions` / `resume` after runtime
+verification. See [setup and approval timing](docs/setup.md#approval-modes-and-existing-seats).
+
+No full bypass, broad command allowance, or lead permission broker is enabled.
+Auto-review can reject actions, and startup trust or native restrictions can
+still require human input. Lead spawning remains a separate local choice,
+disabled by default.
 
 The separate approval-design discussion prompt is in
 [`docs/approval-design-session.md`](docs/approval-design-session.md).
