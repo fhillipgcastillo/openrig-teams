@@ -89,9 +89,13 @@ lists, runs `rig-exclude`, and starts the teams.
    ```sh
    bin/rig-job finish <project> <job> --teams fe             # stop the teams
    bin/rig-job finish <project> <job> --teams fe --worktree  # and remove the worktree
+   bin/rig-job finish <project> <job> --teams fe --detach-worktree  # keep files, remove Git link
    ```
    Removing the worktree is only with `--worktree`, and only after the human
-   confirms.
+   confirms. `--detach-worktree` keeps the folder and files while unregistering
+   it from Git; use it when the files must remain. Both modes retain the branch.
+   `start` refuses an existing branch before preparation or launch, so inspect
+   the reported worktrees and choose another branch or clean up explicitly.
 
 Who may run it: the human, or any agent they ask. The lead may run it only when
 `bin/rig-job can-spawn` prints `yes`, which needs `LEAD_MAY_SPAWN=1` in

@@ -91,6 +91,29 @@ branch and worktree, `bin/rig-exclude`, then `bin/rig-team <team> <worktree> up`
 
 `rig tui` shows everything; `rig ps --nodes -A` lists every seat address.
 
+`start` refuses an existing branch before runtime checks, worktree hooks,
+dependency preparation or team launches, including in `--plan`. Its error shows
+the repository's registered worktrees. Choose a different `--branch` or inspect
+and explicitly clean up the existing branch/worktree before retrying.
+
+`finish` keeps files unless a cleanup flag is selected:
+
+- `--worktree` deletes the worktree through the profile hook or Git. It verifies
+  that both the folder and Git registration are gone. Dirty files can prevent
+  deletion; the command fails rather than forcing their removal.
+- `--detach-worktree` removes only the selected Git registration and its `.git`
+  link, preserving the folder and all other files, including unfinished work.
+  It bypasses the profile's deletion hook. The folder becomes an ordinary
+  directory; inspect or move it before reusing that path.
+
+Both choices keep the branch. Removing a worktree does not remove its branch;
+an existing branch will still prevent `start`. Use `--plan` to preview cleanup.
+
+If a seat's `rig` reads cannot reach the daemon, do not infer that teams are
+missing. Codex seats should retry through their native approval mechanism when
+the sandbox blocks access. A rejected or failed retry is a connectivity blocker,
+not a reason to spawn replacements or restart the daemon.
+
 ### Config and project profiles (outside this repo)
 
 `~/.config/openrig-teams/` (created by `bin/setup`) is machine-local and never

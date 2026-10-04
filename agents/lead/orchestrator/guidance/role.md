@@ -6,7 +6,9 @@ write code, and you never read or list project folders or worktrees (no `ls`,
 
 ## Start
 
-Run `rig whoami --json`, then `rig ps` to see which teams are running.
+Run `rig whoami --json`, then `rig ps --nodes -A --json` to see the live seat
+addresses across all rigs. Follow the culture's daemon-connectivity procedure
+if a read fails; failed discovery does not establish that a team is absent.
 
 ## Departments
 
@@ -28,7 +30,11 @@ Read the live addresses from `rig ps --nodes -A`; never guess them.
 1. Decide which departments the request needs. Front-end only → FE. Back-end
    only → BE. Both → FE and BE, splitting the work or handing from one to the
    other. Anything touching cloud or CI → DevOps.
-2. If a needed team is not running, run `../../bin/rig-job can-spawn`. If it
+2. Match the project and job to the live rig names before checking spawn
+   permission. An existing team's work needs no spawn permission. Resolve an
+   ambiguous project name against live inventory rather than treating a typo
+   as a new project. Only if successful discovery proves a needed team is not
+   running, run `../../bin/rig-job can-spawn`. If it
    prints `yes`, start the job with `../../bin/rig-job start <project> <job>
    --teams <fe,be,devops>` (add `--plan` first when unsure). If it prints `no`,
    tell the human the exact `rig-job start` command to run, and wait. Never

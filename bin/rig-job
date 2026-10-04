@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # usage: rig-job start <project> <job> [--teams fe,be] [--branch B] [--base B] [--repo PATH] [--brief TEXT] [--plan]
-#        rig-job finish <project> <job> [--teams fe,be] [--repo PATH] [--worktree] [--plan]
+#        rig-job finish <project> <job> [--teams fe,be] [--repo PATH] [--worktree|--detach-worktree] [--plan]
 #        rig-job can-spawn | profile-init <project> | doctor <project> [--repo PATH]
 set -euo pipefail
 
@@ -42,7 +42,26 @@ default_create_worktree() {
 }
 
 default_remove_worktree() {
-  run git -C "$PROJECT_PATH" worktree remove "$WORKTREE"
+  run git -C "$PROJECT_PATH" worktree remove "$WORKTREE" || die "worktree removal failed; files and registration may remain. Inspect them, or use --detach-worktree to keep files and remove only the Git link"
+}
+
+reject_existing_branch() {
+  git -C "$PROJECT_PATH" check-ref-format --branch "$BRANCH" >/dev/null || die "invalid branch: $BRANCH"
+  if git -C "$PROJECT_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+    git -C "$PROJECT_PATH" worktree list --porcelain >&2
+    die "branch $BRANCH already exists; nothing started. Inspect the worktree list above, then choose another branch or explicitly clean up the existing branch/worktree"
+  fi
+}
+
+verify_worktree_removed() {
+  [ "$PLAN" = 1 ] && return 0
+  local path
+  while IFS= read -r path; do
+    [ "$path" != "worktree $WORKTREE" ] || die "worktree still registered: $WORKTREE; removal did not complete"
+  done < <(git -C "$PROJECT_PATH" worktree list --porcelain)
+  if [ "$DETACH_WORKTREE" = 0 ]; then
+    [ ! -e "$WORKTREE" ] || die "worktree directory still exists: $WORKTREE; removal did not complete"
+  fi
 }
 
 load_profile() {
@@ -81,7 +100,7 @@ copy_untracked() {
 }
 
 parse_options() {
-  TEAMS=""; BRANCH=""; BASE=""; REPO=""; BRIEF=""; REMOVE_WORKTREE=0
+  TEAMS=""; BRANCH=""; BASE=""; REPO=""; BRIEF=""; REMOVE_WORKTREE=0; DETACH_WORKTREE=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --teams) TEAMS=$2; shift 2 ;;
@@ -90,10 +109,12 @@ parse_options() {
       --repo) REPO=$2; shift 2 ;;
       --brief) BRIEF=$2; shift 2 ;;
       --worktree) REMOVE_WORKTREE=1; shift ;;
+      --detach-worktree) DETACH_WORKTREE=1; shift ;;
       --plan) PLAN=1; shift ;;
       *) die "unknown option $1" ;;
     esac
   done
+  [ "$REMOVE_WORKTREE" = 0 ] || [ "$DETACH_WORKTREE" = 0 ] || die "choose --worktree or --detach-worktree, not both"
 }
 
 cmd_start() {
@@ -105,6 +126,7 @@ cmd_start() {
   load_profile "$project" "$REPO"
   [ -n "$BASE" ] && BASE_BRANCH=$BASE
   BRANCH=${BRANCH:-feature/$JOB}
+  reject_existing_branch
   TEAMS=${TEAMS:-$DEFAULT_TEAMS}
   [[ "$TEAMS" =~ ^(fe|be|devops)(,(fe|be|devops))*$ ]] || die "invalid teams: $TEAMS"
   local selected_teams=() selected_runtime
@@ -114,8 +136,7 @@ cmd_start() {
   say "project $project ($PROJECT_PATH) $([ "$HAVE_PROFILE" = 1 ] && echo "profile: yes" || echo "profile: none, plain git")"
   say "job $JOB  branch $BRANCH (from $BASE_BRANCH)  teams $TEAMS"
 
-  if git -C "$PROJECT_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then say "branch $BRANCH exists, reusing it"
-  else run git -C "$PROJECT_PATH" branch "$BRANCH" "$BASE_BRANCH"; fi
+  run git -C "$PROJECT_PATH" branch "$BRANCH" "$BASE_BRANCH"
 
   if declare -F profile_create_worktree >/dev/null; then profile_create_worktree; else default_create_worktree; fi
   [ -n "${WORKTREE:-}" ] || die "creating the worktree did not set WORKTREE"
@@ -148,10 +169,16 @@ cmd_finish() {
   local team
   for team in ${TEAMS//,/ }; do run "$root/bin/rig-team" "$team" "$WORKTREE" remove || say "team $team was not running"; done
 
-  if [ "$REMOVE_WORKTREE" = 1 ]; then
+  if [ "$DETACH_WORKTREE" = 1 ]; then
+    run node "$root/lib/worktree-detach.mjs" "$PROJECT_PATH" "$WORKTREE"
+    verify_worktree_removed
+    say "worktree detached; files kept at $WORKTREE; branch kept"
+  elif [ "$REMOVE_WORKTREE" = 1 ]; then
     if declare -F profile_remove_worktree >/dev/null; then profile_remove_worktree; else default_remove_worktree; fi
+    verify_worktree_removed
+    say "worktree removed; branch kept"
   else
-    say "worktree kept. Add --worktree to remove it after the branch is merged or abandoned"
+    say "worktree kept. Add --worktree to delete it, or --detach-worktree to keep files and remove the Git link, after the branch is merged or abandoned"
   fi
 }
 

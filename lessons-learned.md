@@ -14,3 +14,17 @@ machine preferences separately from reusable role definitions.
 
 **Trigger:** Onboarding a project, switching coding CLIs on one machine, or
 configuring approvals in openrig-teams.
+
+## 2026-10-04 — Trace package-manager selection before recommending version changes
+
+**Mistake:** Earlier replies recommended aligning the global pnpm version with
+the project pin without tracing why job setup selected the global version.
+
+**Rule:** Compare the exact profile invocation with execution inside the
+worktree. Corepack selects a package manager using the process working
+directory before pnpm handles `--dir`. Run project package-manager commands
+from the worktree so its committed pin controls selection. Downloading a newer
+version can also update Corepack's default and temporarily conceal this bug;
+verify against a different default in an isolated cache configuration.
+
+**Trigger:** Investigating pnpm version mismatches during rig-job preparation.

@@ -25,6 +25,16 @@ about the code itself.
 - One job = one worktree = one branch. A team works only inside its own
   worktree. Never edit another team's worktree or the project's main checkout.
 
+## Daemon connectivity
+
+If a `rig` command cannot connect to the daemon, topology and queue state are
+unknown. Never report missing teams or work from a failed read. In Codex,
+retry the same command through the native approval mechanism with
+`sandbox_permissions: require_escalated` when the sandbox blocks connectivity;
+request a narrow command prefix where appropriate. Keep existing native and
+managed restrictions. If the retry is rejected or still fails, report the exact
+command and error. Do not restart the daemon or rigs to fix a sandbox denial.
+
 ## Hard limits (no exceptions, no asking to bypass)
 
 - Never `git commit`, `git push`, open a PR, or merge. The human does that.

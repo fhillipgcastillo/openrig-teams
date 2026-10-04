@@ -36,6 +36,14 @@ uses plain git. Create one with `bin/rig-job profile-init <project>`, check it w
 - Every mutating command in a hook goes through `run`, so `--plan` only prints.
 - Hooks may use `say`, `die`, and the variables `PROJECT_PATH BASE_BRANCH JOB
   BRANCH PLAN WORKTREE`.
+- `start` rejects an existing branch before calling hooks, including in plans.
+- `finish --worktree` requires `profile_remove_worktree` to remove both the
+  directory and its Git registration. A successful hook exit is verified.
+- `finish --detach-worktree` bypasses removal hooks and keeps every file except
+  the `.git` link. It temporarily moves the directory to a sibling holding
+  folder, removes that specific Git registration, and restores the files.
+  If restoration fails, the error names the holding path. It does not prune
+  other worktrees, unlock registrations, or delete branches.
 
 ## Instructions and runtime selection
 

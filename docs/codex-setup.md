@@ -44,3 +44,13 @@ or reconfigure running seats. See [approval timing](setup.md#approval-modes-and-
 
 The lead-mediated approval proposal remains a separate discussion in
 [`approval-design-session.md`](approval-design-session.md).
+
+## Daemon access from seats
+
+The workspace sandbox can block `rig` from reaching the local daemon even when
+it is healthy. Retry a failed coordination command through Codex's native
+approval mechanism with `sandbox_permissions: require_escalated`, using a narrow
+prefix for the command when appropriate. Respect rejected approvals and managed
+restrictions. Do not enable unrestricted access or restart rigs for a sandbox
+connection failure. Successful discovery must precede any conclusion that a
+team is missing; see [Codex security](https://learn.chatgpt.com/docs/security).
