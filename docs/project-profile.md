@@ -24,9 +24,12 @@ uses plain git. Create one with `bin/rig-job profile-init <project>`, check it w
 
 ## Rules of thumb
 
-- **Link** what must stay in sync with the main checkout (shared secrets, certs);
-  **hardlink** (`cp -al`) large dependency folders; **copy** what the seat or
-  OpenRig will modify; **install** nothing without the human.
+- **Link** what must stay in sync with the main checkout (shared secrets, certs).
+  For npm-based projects, **hardlink** (`cp -al`) large dependency folders when
+  that is appropriate. For pnpm projects, let pnpm manage package links and use
+  its shared store when preparing each worktree, so dependencies do not need to
+  be fetched from scratch. **Copy** what the seat or OpenRig will modify;
+  **install** nothing without the human.
 - Report a missing source (`MISS`) and continue; never regenerate secrets.
 - Never start servers or databases from a profile. Teams may do it only when a
   job says so, through the project's isolation tooling.
