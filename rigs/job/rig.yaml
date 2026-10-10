@@ -1,0 +1,49 @@
+version: "0.2"
+name: job-template
+summary: Independent complete team in one assigned workspace
+culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
+pods:
+  - id: control
+    label: Control
+    members:
+      - id: lead
+        agent_ref: "local:../../agents/job/lead"
+        runtime: codex
+        profile: default
+        cwd: "."
+  - id: dev
+    label: Dev
+    members:
+      - id: builder
+        agent_ref: "local:../../agents/job/builder"
+        runtime: codex
+        profile: default
+        cwd: "."
+  - id: verify
+    label: Verify
+    members:
+      - id: reviewer
+        agent_ref: "local:../../agents/job/reviewer"
+        runtime: codex
+        profile: default
+        cwd: "."
+      - id: tester
+        agent_ref: "local:../../agents/job/tester"
+        runtime: codex
+        profile: default
+        cwd: "."
+edges:
+  - kind: delegates_to
+    from: control.lead
+    to: dev.builder
+  - kind: delegates_to
+    from: dev.builder
+    to: verify.reviewer
+  - kind: delegates_to
+    from: dev.builder
+    to: verify.tester
+  - kind: escalates_to
+    from: dev.builder
+    to: control.lead

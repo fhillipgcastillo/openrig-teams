@@ -1,258 +1,181 @@
 # Blueprint: independent job rigs and optional fleet management
 
-Status: proposed design; no runtime implementation in this document.
+Status: implementation specification reconciled 2026-10-10; replaces the earlier speculative contracts. E1–E7 implemented; 66 isolated tests pass. Automated validation and live-check limits are recorded in [findings](../findings.md).
 
 ## Goal
 
-Let a human use any coding assistant to create, inspect, and communicate with independent job rigs instantiated from reusable templates. Each job owns one branch, one linked Git worktree, and one complete rig with its own lead, development seats, and verification seats. An optional fleet manager coordinates multiple jobs through durable records without replacing their leads or becoming a prerequisite for using them. Closing the initiating assistant session does not lose job identity, pending questions, or dependency state.
+Use any coding assistant to launch a complete reusable OpenRig team in either an existing Git checkout or an optional managed worktree. Each job has its own lead and one exclusively assigned workspace. An optional fleet manager observes jobs and relays requests through native OpenRig identity, queues, and messaging. Closing an assistant session does not lose the job inventory, pending work, or handoffs.
 
-The user approved this goal and scope in the design conversation. The contracts below are proposed implementation interfaces, not claims about existing commands or OpenRig capabilities. Element specifications follow review of this blueprint; implementation follows those specifications through `blueprint-execute`.
+The user authorized completing this design and implementing it without another approval gate. Native OpenRig 0.6.4 mechanisms are reused. Environment isolation and the [future shared-learning integration](../shared-knowledge-integration-idea.md) remain outside this round.
 
 ## Acceptance criteria
-
-- AC1 Any ordinary assistant session can request a job through lifecycle tools without a global lead or fleet manager running; the brief reaches that job's own lead.
-- AC2 Each job creates one branch, one linked worktree under `<main-checkout>/.worktrees/<job>`, and one complete rig from a selected template; project hooks can override worktree placement.
-- AC3 Two concurrent jobs have distinct rig, seat, generated-spec, and record identities, including repositories with identical folder names and job names that normalize to the same slug.
-- AC4 A newly opened session can list jobs, inspect progress and verification evidence, identify pending attention requests, and relay an instruction to the correct job lead using durable identities.
-- AC5 Interrupted setup can be inspected and continued without replacing existing rigs or discarding files; stop, resume, delete, and detach act only on recorded resources and preserve the existing branch-retention policy.
-- AC6 Human decisions, permission prompts, failures, and progress are distinguishable; pending requests survive the absence or replacement of the fleet manager and are resolved only through an attributed response.
-- AC7 Fleet management is optional, has one explicit active owner per configured fleet, supports release and handover, and does not grant permission to answer another seat's approval prompts or make reserved human decisions.
-- AC8 Dependent implementation waits for the prerequisite to be merged by the human and made available on the recorded integration branch; independent investigation may proceed, and the dependent lead receives the exact integration revision and handoff evidence.
-- AC9 Shared templates remain reusable across projects and both supported harnesses; project topology, seat models, and runtime choices do not silently change another project's rigs or an existing instance.
-- AC10 Plans and status reads do not mutate project, rig, or permission state; tracked generated-file collisions fail before branch/worktree creation, and unsupported instruction preservation is reported rather than bypassed.
-- AC11 Existing department rigs and external worktrees remain usable without automatic migration, stopping, renaming, or recreation.
-- AC12 Documentation explains the complete workflow, ownership boundaries, and deferred environment isolation; parallel code work is not presented as proof that concurrent stacks are safe.
-
-## Current integration points
-
-| Existing path | Current responsibility | Required change |
-|---|---|---|
-| `bin/rig-job:39` `default_create_worktree` | Creates a real Git worktree in a sibling directory | Default to a locally excluded `.worktrees/` directory |
-| `bin/rig-job:120` `cmd_start` | Creates branch/worktree, prepares, launches department rigs, briefs global lead | Launch one complete job rig and brief its recorded lead |
-| `bin/rig-job:82` `find_worktree` | Discovers worktrees by basename | Use exact manifest identity for new jobs |
-| `bin/rig-job:158` `cmd_finish` | Reconstructs teams and removes them before optional worktree cleanup | Use recorded rig identity and preserve actual stop failures |
-| `bin/rig-job:24` `caller_may_spawn` | Allows human shells and optionally the global lead | Separate ordinary user-directed invocation from explicit fleet-seat lifecycle authority |
-| `bin/rig-team:23` | Derives rig names from checkout and worktree basenames | Retain legacy use; new instances use durable unique identities |
-| `lib/runtime-config.mjs:51` `resolveSeat` | Resolves a fixed set of machine-level department seats | Add complete-template/project resolution without altering legacy resolution |
-| `lib/runtime-launch.mjs:48` `render` | Renders one department template beside its source | Add complete-rig rendering with correct relative resource resolution |
-| `lib/runtime-launch.mjs:63` `permissions` | Verifies inventory before applying Claude preferences | Preserve verification, refusal behavior, and next-launch timing |
-| `bin/rig-exclude` | Checks tracked collisions and writes local artifact exclusions | Separate read-only checks from writes; add root worktree exclusion |
-| `lib/worktree-detach.mjs:11` `detach` | Preserves files while unregistering a selected worktree | Reuse after manifest identity validation |
-| `agents/lead/orchestrator/guidance/role.md` | Global lead forbidden from inspecting project files | Preserve legacy role; add job-local lead and optional fleet role |
-| `culture/CULTURE.md` | Routes every team through one global lead | Express independent job ownership and optional fleet coordination |
-| `tests/job-lifecycle.test.mjs`, `tests/runtime-launch.test.mjs` | Temporary repositories and mocked rig lifecycle coverage | Extend with manifest recovery, concurrency, and complete-rig scenarios |
+- AC1 Any assistant can start, inspect, and instruct job rigs without a global lead.
+- AC2 An explicit --workspace PATH uses an existing checkout without creating/switching a branch; --worktree creates a branch and linked checkout under project/.worktrees/<job> by default.
+- AC3 Only one unfinished job rig reserves a canonical workspace. Simultaneous starts, aliases, and observed legacy rigs cannot bypass checks; refusal names the occupant and offers using it or requesting a separate worktree, without acting on either option.
+- AC4 Jobs, resolved templates, preparation checkpoints, native identities, evidence, and dependencies remain queryable across sessions.
+- AC5 Stop keeps the reservation; continue/resume reconciles recorded resources. Finish retires the rig and releases the reservation. Existing checkout cleanup is prohibited; managed deletion/detachment is explicit and retains the branch.
+- AC6 Native queues hold durable assignments, decisions, updates, and replies, with job tags; status includes queue state and native seat activity. No duplicate attention queue or authentication system is introduced.
+- AC7 Fleet management is optional. A stable native manager seat receives coordination; native attachment/handover controls occupation. Releasing the fleet assignment does not stop any session or job. Ordinary assistants can always query and relay.
+- AC8 Separate-workspace dependencies wait for human merge and revision availability. Sequential same-workspace jobs require verified retained content after predecessor retirement, without imposing a commit/merge.
+- AC9 Complete templates support Codex, Claude, mixed seats, and project overrides for topology/model/runtime/approval; existing instances retain resolved choices.
+- AC10 Plans and reads do not mutate state. Launch/cleanup preserves project instructions outside native managed blocks; unsafe resource collisions fail before preparation.
+- AC11 Legacy department entry points remain explicit and existing rigs/profiles/services are not automatically migrated, stopped, or recreated.
+- AC12 Documentation provides reproducible test commands and explains external CLI polling versus pane delivery, deferred environment isolation, and future external shared-memory integration.
 
 ## Shared contracts
 
-### C1 Identity and local storage
+### C1 State and ownership
 
-- `Id` is a lowercase UUID; `Time` is a UTC RFC 3339 timestamp; all stored filesystem paths are absolute.
-- Configuration root retains `${OPENRIG_TEAMS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/openrig-teams}`.
-- State root is `${OPENRIG_TEAMS_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openrig-teams}`. It contains `repositories/<repository-id>.json`, `jobs/<job-id>/manifest.json`, `jobs/<job-id>/rig/`, `jobs/<job-id>/attention/<request-id>.json`, and `fleets/<fleet-id>.json`.
-- Repository record: `{version:1, id:Id, commonDir:string, mainCheckout:string, aliases:string[]}`. Canonical Git common-directory identity maps a repository to one record on this machine; basename and remote URL are not identity.
-- Job names match `[a-z0-9][a-z0-9-]*`. Invalid names fail with a suggested normalized name rather than silently collapsing distinct inputs. One unfinished job may hold a given name per repository.
-- Default checkout path is `<mainCheckout>/.worktrees/<job-name>`. Add `/.worktrees/` to the common repository's local exclusion block; never create checkouts inside `.git/worktrees/` or edit tracked `.gitignore` automatically.
-- Rig names are `job-<job-name>-<job-id>`; lead addresses are `control-lead@<rig-name>`. Recorded pod/member addresses, not inferred department names, route every operation.
-- Manifest and fleet writes are atomic and revision-checked under per-record locks. Startup reserves repository/job name and target path under a repository lock. Concurrent mutations return a conflict rather than overwriting each other. Files containing briefs and decisions are private to the user.
+State root: `${OPENRIG_TEAMS_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openrig-teams}`. Files: `jobs/<uuid>/manifest.json`, `jobs/<uuid>/rig.yaml`, `jobs/<uuid>/instructions.json`, `fleets/<name>.json`. A state-root directory lock serializes short mutations and lifecycle operations; conflict fails without waiting or automatic lock removal. Atomic private JSON writes retain `version:1`. Job records are the reservation authority: preparing/running/stopped/failed reserve `workspace.path`; finished/removed/detached release it after confirmed retirement. Canonical workspace paths use realpath and Git checkout roots, so symlink/subdirectory aliases compare equally. Existing native inventory is additionally checked through `rig ps --nodes -A --full --json`; unreachable or malformed inventory is unknown and blocks launch. Wrapper UUIDs identify jobs, while native rig/node IDs remain OpenRig-owned opaque strings. No user work is discarded for lock recovery.
 
-### C2 Job manifest
+### C2 Job and project records
 
-`JobManifest` is `{version:1, revision:integer, id:Id, repositoryId:Id, name:string, branch:string, base:{ref:string, commit:string}, worktree:string, template:{source:string, digest:string}, specPath:string, rigName:string, leadAddress:string, seats:Seat[], brief:string, lifecycle:Lifecycle, setup:Setup, outcome:Outcome, evidence:Evidence[], dependencies:Dependency[], integrationBranch:string, mergedCommit:string|null, fleetId:Id|null, createdAt:Time, updatedAt:Time}`.
+`Job` is `{version:1,id:string,project:string,repo:string,commonDir:string,name:string,branch:string|null,baseCommit:string,workspace:{mode:"existing"|"managed-worktree",path:string,owned:boolean},rigName:string,rigId:string|null,leadAddress:string,seats:Seat[],templatePath:string,templateDigest:string,specPath:string,profilePath:string|null,profileDigest:string|null,preparedRepeatable:boolean,setup:string[],attempt:string|null,lifecycle:"preparing"|"running"|"stopped"|"failed"|"finished"|"removed"|"detached",outcome:"unassigned"|"working"|"waiting-human"|"waiting-dependency"|"verified"|"abandoned",brief:string,briefQueueId:string,evidence:Evidence[],dependencies:Dependency[],handoff:object|null,integrationBranch:string,createdAt:string,updatedAt:string,error:string|null,mergedCommit?:string,mergeAttested?:boolean}`. `Seat` is `{pod:string,member:string,address:string,nodeId:string|null,runtime:"codex"|"claude-code",model:string|null,approval:"native"|"auto"}`. `Evidence` is `{author:string,kind:"review"|"test"|"progress"|"handoff",summary:string,reference:string|null,createdAt:string}`. Verified outcome requires distinct recorded review and test authors belonging to the rig. Native identity comes from `rig whoami --json`; ordinary env-less user-directed sessions may operate wrappers without adopting a seat.
 
-- `Seat` is `{address:string, pod:string, member:string, runtime:"codex"|"claude-code", model:string|null, approval:"native"|"auto"}`; unsupported model selection fails during preflight rather than being ignored.
-- `Lifecycle` is `preparing|running|stopped|failed|finished|detached|removed`; it describes managed resources, not whether the assignment succeeded.
-- `Setup` is `{completed:("reserved"|"branch"|"worktree"|"prepared"|"rendered"|"launched"|"briefed")[], failedStep:string|null, error:string|null}`. A checkpoint is recorded only after verification; ambiguous outcomes are reconciled against Git/OpenRig before continuation.
-- `Outcome` is `unassigned|working|waiting-human|waiting-dependency|verified|abandoned`. `verified` requires reviewer and tester evidence, and does not mean merged.
-- `Evidence` is `{id:Id, kind:"review"|"test"|"progress"|"handoff", author:string, summary:string, reference:string|null, createdAt:Time}`. A reference identifies retrievable durable material; a transient terminal message is insufficient evidence storage.
-- `Dependency` is `{jobId:Id, policy:"human-merge", state:"waiting"|"ready"|"blocked", requiredCommit:string|null, integrationCommit:string|null, handoffEvidenceIds:Id[]}`. Dependencies form an acyclic graph within one repository in the first version.
-- OpenRig remains the authority for live rig/seat state and native queues. The manifest owns lifecycle checkpoints and the human-facing job index; it references native work items rather than duplicating their task state.
-- Stored lifecycle plus live observation must both be shown. Unreachable daemon state is `unknown`, never proof that a rig is absent or safe to replace.
+Optional project `.openrig-teams/project.json`: `{version:1,template?:string,integrationBranch?:string,worktreeDirectory?:string,seats?:{"pod.member":{runtime?:string,model?:string,approval?:string}},environment?:{concurrentStacks:string,notes:string}}`. Project overrides apply after template and machine defaults; native restrictions always apply. Shell profiles remain in the existing config directory. New complete-job preview reads literal assignments only, never sources shell profiles. `--repo` can supply a nonliteral path explicitly. Mutating preparation uses existing hooks, but existing mode calls only an explicit `profile_prepare_existing_workspace`. Managed hooks may create/prepare/remove worktrees; custom creation requires a declarative `WORKTREE_PATH` matching the hook output. `PREPARE_REPEATABLE=1` permits an interrupted preparation retry; otherwise continuation refuses ambiguous retries. Profile digest changes block recovery until the original preparation contract is restored.
 
-### C3 Configuration and rig template
+### C3 Complete rig rendering
 
-- Existing shell project profiles retain machine paths and `profile_create_worktree`, `profile_prepare_worktree`, and `profile_remove_worktree` hooks. Hook execution occurs only in mutating operations; preview uses a declarative plan and does not source arbitrary project hooks as a supposed read-only guarantee.
-- Optional project-owned `.openrig-teams/project.json` is `{version:1, template:string, integrationBranch:string, worktreeDirectory:string|null, seats:{"<pod>.<member>":{runtime?:"codex"|"claude-code", model?:string, approval?:"native"|"auto"}}, environment:{concurrentStacks:"unsupported"|"project-managed", notes:string}}`. Relative paths resolve from the main checkout, and external template sources require explicit configuration.
-- Resolution order is reusable template defaults, machine runtime defaults, then explicit project seat overrides. Existing machine department overrides remain confined to legacy department templates. Native/managed harness permission restrictions always apply.
-- A job stores its resolved seats and template digest at creation; later default changes affect new jobs only. Resume uses the recorded instance configuration.
-- Initial complete template is `rigs/job/rig.yaml`: pod `control` with member `lead`, pod `dev` with member `builder`, pod `verify` with members `reviewer` and `tester`; all run in the job worktree. Lead delegates to builder; builder requests verification; findings return to builder; verified evidence returns to lead. Project templates may replace the topology while retaining exactly one designated lead.
-- New job lead guidance is `agents/job/lead/`; fleet guidance is `agents/fleet/manager/`. Complete-template seats may reuse existing role resources only where those resources do not assume department addresses or a global lead.
-- Generated specs and their referenced resources live under C1's instance directory with valid installed OpenRig resource resolution. The renderer validates the whole topology and selected-runtime artifact union before launch.
+Initial `rigs/job/rig.yaml` has `control.lead`, `dev.builder`, `verify.reviewer`, and `verify.tester`; role guidance is sent per seat. All work in the assigned workspace. Custom templates designate `control.lead` and include independent review/test seats. Native member `model` and `path:` agent references are used. Instance spec sits outside the workspace with absolute agent references and a copied relative culture file. Rendered configuration is saved once and reused on resume. Machine settings remain compatible with the existing runtime.json. Claude permission choices are recorded after initial launch and before resume, with the existing next-launch limitation. Codex auto requires the existing optional profile. Native schema validation and selected executable checks run before creation. Tracked instruction files are permitted only through managed-block merging; other tracked projection collisions refuse launch. Instructions are snapshotted before each launch/resume; after teardown original bytes are restored only if nonmanaged content is unchanged, otherwise user edits remain. No generic restore/reset is used.
 
-### C4 Lifecycle and query CLI
+### C4 Job CLI
 
-All commands in this contract are proposed additions or revised semantics of this repository's wrappers; they are not new upstream `rig` commands.
+New complete-job path: `bin/rig-job start PROJECT NAME (--workspace PATH|--worktree) [--repo PATH] [--template PATH] [--branch REF] [--base REF] [--brief TEXT] [--depends-on ID] [--plan] [--json]`. Only managed mode accepts branch/base options. Legacy `--teams`, old non-UUID finish calls, starts lacking both workspace flags, and existing profile/doctor entry points retain their old implementation. New complete jobs always select an explicit workspace mode. New UUID commands: `list [--project PROJECT]`, `status ID`, `continue ID`, `stop ID`, `resume ID`, `finish ID [--worktree|--detach-worktree]`, `tell ID --message TEXT`, `report ID --outcome VALUE --evidence-file PATH`; read/mutation commands accept `--json`, lifecycle mutations accept `--plan`. Unknown/conflicting flags fail.
 
-- `bin/rig-job start <project> <job> [--repo PATH] [--template PATH] [--branch REF] [--base REF] [--brief TEXT] [--depends-on JOB_ID ...] [--plan] [--json]` creates a new complete-rig job. Omitted brief leaves `outcome:unassigned`; it does not fabricate an assignment.
-- `bin/rig-job list [--project PROJECT] [--json]` and `bin/rig-job status <job-id> [--json]` read persisted and observable live state without mutation.
-- `bin/rig-job continue <job-id> [--plan] [--json]` reconciles interrupted setup and runs only unfinished safe stages. Profile preparation must declare repeatability in its element spec; an ambiguous nonrepeatable hook blocks with an actionable error.
-- `bin/rig-job stop <job-id> [--plan] [--json]` snapshots/stops only the recorded rig, keeping branch, files, and manifest; `resume <job-id>` with the same options resumes a verified stopped instance, without re-rendering from changed defaults.
-- `bin/rig-job finish <job-id> [--worktree|--detach-worktree] [--plan] [--json]` retires the recorded rig after the human's merge/abandon decision. No cleanup flag keeps files and Git registration. Delete refuses dirty/locked worktrees; detach preserves files. Both retain branches and job history. Actual stop failure prevents worktree cleanup.
-- `bin/rig-job tell <job-id> --message TEXT [--json]` persists an instruction as a C5 request of kind `instruction`, addressed to the recorded lead, before attempting notification.
-- `bin/rig-job report <job-id> --outcome OUTCOME --evidence-file PATH [--json]` accepts a JSON `Evidence[]` payload and validates the caller's recorded seat ownership. Only the job lead changes outcome; reviewer/tester evidence retains its original author.
-- Exit codes: `0` success, `1` execution/connectivity failure, `2` invalid input/configuration, `3` identity/ownership/revision conflict, `4` unmet prerequisite. JSON output is `{ok:true,data:object|array}` or `{ok:false,error:{code:string,message:string,jobId:Id|null}}`; diagnostics go to stderr. List entries are `{job:JobManifest, live:{state:"running"|"stopped"|"absent"|"unknown", observedAt:Time, error:string|null}, attention:AttentionRequest[]}`; status returns one such entry.
-- Preview validates without creating branches, checkouts, persistent state, generated specs, or permission changes. Existing branch/path/rig collisions refuse adoption. Recovery requires the matching manifest and verified resource ownership.
-- Legacy name-based `start/finish --teams` remains an explicitly documented legacy path during transition; it cannot silently reinterpret existing department rigs as complete job rigs.
+Start preflights, reserves, creates managed resources if requested, prepares, snapshots instructions, renders, launches, verifies inventory, applies supported permissions, and queues a stable-ID brief to its lead. It records an attempt before each external effect; ambiguous creation is reconciled from exact recorded path/branch/rig and otherwise blocked. Continue never blindly relaunches an observed rig or repeats a nonrepeatable hook. Status is `{job:Job,live:{state:"running"|"stopped"|"absent"|"unknown",nodes:object[],error:string|null},queue:{items:object[],error:string|null}}`; native activity is retained in nodes. Unknown native state is never absence. Finish verifies rig retirement before cleanup/releasing reservation. All branches remain.
 
-### C5 Durable attention and delivery
+JSON results: `{ok:true,data:object|array}` or `{ok:false,error:{code:string,message:string,jobId:string|null,conflict?:{workspacePath:string,jobId:string|null,rigName:string|null,options:string[]}}}`. Exit 0 success, 1 execution/connectivity, 2 input/config, 3 conflict, 4 dependency blocked. `workspace_occupied` options are `use-existing-rig` and `request-worktree-job`. No automatic stop, takeover, or alternative launch.
 
-`AttentionRequest` is `{version:1, revision:integer, id:Id, jobId:Id, kind:"decision"|"permission"|"failure"|"progress"|"instruction", author:string, recipient:"human"|"lead", summary:string, detail:string, blocking:boolean, status:"open"|"answered"|"acknowledged", response:{author:string, body:string, createdAt:Time}|null, createdAt:Time, updatedAt:Time}`.
+### C5 Native coordination
 
-- `bin/rig-job attention <job-id> --kind KIND --summary TEXT --detail TEXT [--blocking] [--json]` creates a request. Job seats are restricted to their own job; permission requests name the seat and native prompt without answering it.
-- `bin/rig-job answer <job-id> <request-id> --body TEXT [--json]` records the human-directed answer. Fleet ownership alone does not authorize answering a human decision. Caller identity is recorded by tools, not accepted from an arbitrary `--author` flag.
-- `bin/rig-job acknowledge <job-id> <request-id> [--json]` records recipient receipt; decisions/permissions must have an answer first. Native permission resolution remains a separate harness operation and cannot be inferred from textual acknowledgement.
-- Progress is nonblocking and not counted as unresolved human attention. Instructions target the lead; other kinds target the human. Unacknowledged records are discoverable without any manager running.
-- Notification is best effort after durable creation; retries retain the same request ID. Recipients reconcile by ID before acting. No exactly-once delivery claim is made. Session closure or failed messaging never deletes requests or falsely marks them answered.
+`tell` creates a native qitem with `--destination LEAD --id STABLE_ID --tags job:ID,kind:instruction --body TEXT --summary TEXT --json`. Initial brief uses persisted `briefQueueId` for retry deduplication; continuation first observes an existing correctly tagged/destined qitem, preserving original authorship across caller changes. Managed callers use native CLI identity. The installed queue CLI rejects env-less writes; ordinary human-directed shells therefore use OpenRig's installed DaemonClient and native queue API with declared caller `openrig-teams-shell`, recorded by the native sender resolver as `claimed:v1`, without a seat header or impersonation. Native transport/authentication and ledger provenance stay authoritative. `attention ID --kind decision|permission|failure|progress --summary TEXT --detail TEXT [--destination ADDRESS]` queues a request to the designated fleet manager if present, otherwise the job lead, tagged `job:ID,attention:KIND`; it remains visible through status without a manager. An explicit registered human destination may be supplied with a durable evidence reference. `answer ID QITEM --body TEXT` appends an attributed native queue note and creates an idempotent lead reply qitem; it does not forge human identity, bypass native approval, or mark someone else's task complete. Lead/manager acknowledges through native queue claim/update/handoff. Status queries native `queue list --all --all-rigs --full --json` and filters by job tags; no local copy of queue state. Decision content remains durable even if delivery fails. Native queue persistence is authoritative; wrapper failure reports delivery/persistence uncertainty honestly.
 
-### C6 Optional fleet ownership
+### C6 Optional fleet
 
-`FleetRecord` is `{version:1, revision:integer, id:Id, name:string, jobIds:Id[], managerAddress:string|null, owner:{token:Id, sessionId:string, address:string, acquiredAt:Time, heartbeatAt:Time, expiresAt:Time}|null}`.
+`Fleet` is `{version:1,name:string,jobIds:string[],manager:{rigId:string,nodeId:string,address:string}|null,coordinating:boolean,instance?:{id:string,rigName:string,rigId:string|null,workspace:{path:string,mode:"existing",owned:false},seats:Seat[],specPath:string,launched:boolean}}`. `bin/rig-fleet create NAME`, `up NAME`, `add NAME JOB_ID`, `status NAME`, `take NAME --seat ADDRESS`, `release NAME`, and `handover NAME --source SOURCE` accept --json; up/take/release/handover accept --plan. Up optionally creates a native manager instance in a state-directory home, with a frozen spec and recorded native identity; retries reconcile that same instance rather than replace it. A native assignment qitem gives the manager the fleet name and absolute tool paths. Take selects an existing native seat reference and records coordination after verifying its identity. It does not claim that the caller became its occupant. An env-less assistant may select the seat on the human's behalf; a managed caller must actually be that seat. Attachment to unbound seats uses native `rig attach --self`; occupant replacement uses native `rig seat handover`, with its results reported independently. Release only sets coordinating=false, preserving manager identity, queues, session, and jobs. No native detach/stop is implied. External CLI seats can poll queues; installed external_cli bindings lack inbound tmux transport, so automatic pane nudges require a managed pane. Native bindings own identity and handover; no leases, tokens, separate authentication, or heartbeat daemon. Fleet-seat lifecycle authority requires separately saved `FLEET_MAY_SPAWN=1`; ordinary shells are allowed and other job seats cannot spawn sibling jobs.
 
-- `bin/rig-fleet create <name> [--json]`, `add <fleet-id> <job-id> [--json]`, and `status <fleet-id> [--json]` manage membership and aggregate C4/C5 records. Status does not require an owner.
-- `bin/rig-fleet take <fleet-id> --seat ADDRESS [--json]` verifies a live designated fleet seat and caller session, acquires exclusive ownership, and returns the owner token. `heartbeat <fleet-id> --token TOKEN`, `release <fleet-id> --token TOKEN`, and `handover <fleet-id> --token TOKEN --seat ADDRESS` are explicit mutations; all support `--json`.
-- Ownership expires after 120 seconds without renewal; agents renew at least every 30 seconds while actively coordinating. Expiry does not stop jobs. Handover invalidates the previous token atomically; an absent/expired owner leaves requests queued until someone explicitly takes ownership.
-- Fleet-coordinating writes require a current owner token; tools reject stale owners. Ordinary human-directed job queries/instructions do not require fleet ownership.
-- There is one stable designated manager seat address per fleet; seat replacement is an explicit handover, not an automatic rewrite. Lead requests are stored by job ID regardless of notification destination.
-- An ordinary assistant can inspect/relay without becoming a seat. Occupying fleet management requires a verified OpenRig seat. Attaching an existing external session is an integration question, not an assumed capability; a supported managed-seat handover is the fallback.
-- Fleet lifecycle spawning is a separately saved machine authorization, disabled by default for seats. Job seats cannot create sibling jobs. No role may approve another seat's permission prompts or merge code.
+### C7 Dependencies
 
-### C7 Dependency readiness
-
-- `bin/rig-job merged <job-id> --commit REV [--json]` is a human-directed declaration. Tools verify the prerequisite's recorded branch tip is contained in the declared commit and that commit is on the recorded integration branch. Squash/rebase merges that fail ancestry verification remain blocked pending an explicit human-attested mapping recorded as handoff evidence; they are never guessed equivalent.
-- `bin/rig-job dependency-check <job-id> [--json]` verifies each recorded prerequisite has merge evidence and records `requiredCommit`, `integrationCommit`, and handoff evidence only after verification. It uses existing local refs; no implicit fetch, merge, rebase, or cherry-pick.
-- Readiness releases dependent implementation only when its worktree HEAD contains the required integration revision. A pre-created worktree behind that revision remains waiting until the human authorizes its update through project tooling. Dirty work is preserved.
-- Until ready, the lead may delegate independent investigation with an explicit boundary; it cannot implement against an unmerged assumed contract. Abandoned prerequisites block dependents. Cycle/unknown-job/cross-repository dependencies fail validation.
-- The fleet manager may notify and request a check; readiness is derived by tools and does not depend on an agent saying “done.”
+`Dependency` is `{jobId:string,policy:"human-merge"|"workspace-handoff",state:"waiting"|"ready"|"blocked",commit:string|null,handoffAcceptedAt?:string}`. Dependencies must be in the same repository, cannot cycle, and cannot refer to abandoned jobs. `merged ID --commit REV` records a human-directed integration revision only after ancestor checks against the recorded source branch/revision and configured integration branch. `--attest` explicitly records a human-authorized squash/rebase mapping. Separate-workspace implementation requires the dependent HEAD to contain that commit; no automatic fetch/merge/rebase/cherry-pick. Investigation may run while waiting, with the restriction in the lead brief. `dependency-check ID` updates readiness. Same-workspace sequential jobs require the predecessor retired and verified plus a matching retained handoff at acceptance, including reuse of a formerly managed checkout as an existing workspace. Once accepted, the recorded baseline permits the dependent job to edit that content; changes before acceptance remain blocked. `handoff ID --file PATH` stores `{head:string,files:[{path:string,kind:"file"|"symlink"|"absent",digest:string|null}]}` using SHA-256 digests and reviewer/tester evidence; paths cannot escape the checkout. No automatic commits or merges. Only one rig reserves that workspace at a time.
 
 ## Elements
 
-### E1 job records — state library — new `lib/job-state.mjs`
+### E1 state and native tools — new/modify `lib/job-state.mjs, lib/job-tools.mjs, lib/job-native-queue.mjs`
 
-- Serves: AC3, AC4, AC5, AC6, AC7, AC8.
-- Responsibility: Persist and validate repository, job, request, and fleet records with exclusive reservation and revision checks.
-- Needs: C1, C2, C5, C6; `lib/runtime-config.mjs:85` `writeAtomic` as an existing atomic-write reference.
-- Produces: C1 local records and validated C2/C5/C6 values.
-- Interface: `readJob(id): JobManifest`, `listJobs(repositoryId|null): JobManifest[]`, `createJob(manifest): JobManifest`, `updateJob(id, expectedRevision, changes): JobManifest`; corresponding record operations obey C1 revision/locking rules.
-- Rules: IDs and paths are validated; unavailable live state never rewrites persisted ownership; conflicts preserve both files and the current record; retained history survives worktree cleanup.
-- Verified by: Temporary-state tests for duplicate reservations, concurrent revision conflicts, interrupted writes, and history retention.
+- Serves: AC3, AC4, AC5, AC7.
+- Responsibility: Persist private job/fleet records, serialize reservations, and wrap exact native CLI operations.
+- Needs: C1, C2, C4; lib/runtime-config.mjs:85 writeAtomic.
+- Produces: C1 records and C4 errors/native observations.
+- Interface: readJob(id), listJobs(), saveJob(job), withStateLock(fn), run(command,args), nativeInventory(), nativeQueue().
+- Rules: Never infer absence from failed reads; reject concurrent locks; validate paths and IDs.
+- Verified by: State/CLI fixture tests prove serialization, aliases, error classification, and native response validation.
 - Open: none.
 
-### E2 complete rig configuration — renderer — modify `lib/runtime-config.mjs`, `lib/runtime-launch.mjs`; new `rigs/job/rig.yaml`, `agents/job/lead/`
+### E2 complete rig templates — new/modify `lib/job-rig.mjs, rigs/job/rig.yaml, agents/job/*`
 
-- Serves: AC1, AC2, AC3, AC9, AC10, AC11.
-- Responsibility: Resolve a reusable complete topology and render a validated immutable instance configuration.
-- Needs: C1, C2, C3; existing schema loading in `lib/runtime-launch.mjs:18` and approval checks in `lib/runtime-launch.mjs:63`.
-- Produces: C2 resolved seats and C1 instance rig resources from C3.
-- Interface: `resolveJobRig(projectPath, templatePath, machineSettings): {templateDigest:string,seats:Seat[],leadPod:string,leadMember:string}` and complete-rig render/preflight entry points specified against C3/C4.
-- Rules: Invalid topology/model/instruction collisions fail before job creation; generated references remain valid outside shared template folders; approval timing and native refusal remain explicit; legacy templates keep their behavior.
-- Verified by: Installed-schema validation of complete/mixed templates and tests for project separation, frozen resume configuration, and generated-resource paths.
-- Open: Verify installed runtime model fields, generated instruction preservation, and relocated resource resolution before writing this element's implementation spec; retain refusal where preservation is unsupported.
+- Serves: AC1, AC2, AC9, AC10.
+- Responsibility: Resolve complete native RigSpecs and preserve project instructions.
+- Needs: C2, C3; lib/runtime-launch.mjs:18 native schema loading.
+- Produces: Frozen C3 spec, seats, culture, instruction snapshots.
+- Interface: resolveRig(project,options), renderRig(job,resolution), snapshotInstructions(job), restoreInstructions(job).
+- Rules: Both harnesses and project overrides work; unsafe paths fail; preserve user content.
+- Verified by: Schema tests and native managed-block fixture round trips for tracked/untracked instructions.
+- Open: none.
 
-### E3 job lifecycle — CLI and worktree integration — modify `bin/rig-job`, `bin/rig-exclude`; new `lib/job-lifecycle.mjs`
+### E3 workspace lifecycle — new/modify `lib/job-lifecycle.mjs, lib/job-cli.mjs, bin/rig-job`
 
 - Serves: AC1, AC2, AC3, AC4, AC5, AC10, AC11.
-- Responsibility: Execute and reconcile only the recorded job's branch, worktree, rig, and initial brief.
-- Needs: E1, E2; C1–C4, C5 for persisted briefs/instructions; existing lifecycle functions and `lib/worktree-detach.mjs:11`.
-- Produces: C4 command results, C2 checkpoints, one complete rig, and a default locally excluded worktree.
-- Interface: C4 lifecycle/query commands; `bin/rig-exclude <project> --check [--runtime codex|claude-code|both]` is the new read-only collision preflight.
-- Rules: Preflight precedes branch/worktree changes; plans execute no arbitrary profile hooks; failure leaves inspectable recoverable state; stop failures block cleanup; no adoption of unrelated branches or rigs; legacy mode stays explicit.
-- Verified by: Two-job temporary Git scenarios, collision cases, injected failures at every setup stage, recovery without duplicate launch/brief, and dirty/locked cleanup preservation.
-- Open: Define a declarative preview bridge and repeatability metadata for existing shell hooks during element specification; unclassified hooks cannot be retried automatically.
-
-### E4 attention and reporting — job communication tools — new `lib/job-attention.mjs`, modify `bin/rig-job`
-
-- Serves: AC4, AC6, AC7.
-- Responsibility: Persist attributed job evidence, human requests, responses, and lead instructions before attempting delivery.
-- Needs: E1; C2, C4 report/tell/query interfaces, C5; recorded lead identity supplied by E3 at runtime.
-- Produces: C5 requests, C2 evidence/outcome updates, and retrievable notification status.
-- Interface: C4 `tell/report` and C5 attention/answer/acknowledge commands.
-- Rules: Failed delivery retains requests; repeats use request IDs; job-seat ownership is checked; reserved human decisions and native approvals remain human-controlled; verified outcome requires distinct reviewer/tester evidence.
-- Verified by: Manager-offline creation, new-session query, duplicate delivery, unauthorized response, and verified-without-evidence refusal tests.
-- Open: Verify installed native queue/message identifiers and choose durable evidence references in the element spec; do not invent upstream event APIs.
-
-### E5 optional fleet management — CLI and agent role — new `bin/rig-fleet`, `lib/fleet-manager.mjs`, `agents/fleet/manager/`
-
-- Serves: AC4, AC6, AC7.
-- Responsibility: Aggregate durable job information and coordinate through an explicitly owned optional manager seat.
-- Needs: E1, E4; C4 status, C5, C6; E3 supplies observable live inventory.
-- Produces: C6 ownership/membership records, fleet status, and routed attention notifications.
-- Interface: C6 fleet commands; fleet role follows C5/C6 and invokes C4 tools rather than raw lifecycle assembly.
-- Rules: Job operation continues without ownership; only the current token coordinates fleet writes; expiry/handover rejects stale owners; permission to spawn is separate; ordinary assistant reads require no seat takeover.
-- Verified by: Competing take, owner expiry, handover, stale-token rejection, manager disappearance, and complete operation without a fleet manager.
-- Open: Verify installed OpenRig seat takeover/handover and caller identity; external-session attachment is optional and must not block managed-seat fleet operation.
-
-### E6 merge-first dependencies — readiness tools — new `lib/job-dependencies.mjs`, modify `bin/rig-job`
-
-- Serves: AC8.
-- Responsibility: Gate dependent implementation on human merge evidence and an available integration revision.
-- Needs: E1, E4; C2, C7; C4 returns job status and evidence.
-- Produces: C2 dependency state and C7 actionable handoff results consumed by job leads and E5.
-- Interface: C7 `merged/dependency-check` commands and dependency validation for C4 start.
-- Rules: Completion alone never releases work; ancestry and dependent HEAD are checked; squash/rebase ambiguity requires recorded human attestation; no automatic code integration; cycles and abandoned prerequisites remain blocked.
-- Verified by: Unmerged verified job, merged-but-stale dependent, ready dependent, dirty checkout preservation, squash ambiguity, and cycle rejection scenarios.
+- Responsibility: Prepare and reconcile a complete job in the selected workspace mode.
+- Needs: E1, E2; C1-C4, C5 stable brief.
+- Produces: C4 commands, records and exclusive complete rigs.
+- Interface: C4 lifecycle CLI; legacy bash entry moved intact to bin/rig-job-legacy.
+- Rules: Existing checkout and user services are preserved; collisions refuse before preparation; ambiguous recovery blocks.
+- Verified by: Temporary Git tests for both modes, simultaneous starts, legacy occupancy, recovery, instruction cleanup and dirty/locked deletion.
 - Open: none.
 
-### E7 workflow guidance and compatibility — skills and documentation — new `skills/job-rigs/SKILL.md`; modify `README.md`, `AGENTS.md`, `docs/project-profile.md`, `culture/CULTURE.md`
+### E4 native communication and evidence — new/modify `lib/job-coordination.mjs, lib/job-cli.mjs`
 
-- Serves: AC1, AC4, AC7, AC9, AC10, AC11, AC12.
-- Responsibility: Teach any assistant the same mechanical tool workflow and explain legacy versus complete-job operation.
-- Needs: C1–C7; E2–E6 command behavior and documented integration limits.
-- Produces: Project-owned workflow skill, current usage examples, migration boundaries, and deferred-environment problem statement.
-- Interface: Natural requests map to C4–C7; skill installation remains explicit and does not modify unrelated global harness configuration.
-- Rules: Job leads may inspect their own project; fleet manager routes requests without replacing leads; no automatic migration; no claims of safe concurrent stacks; retain human ownership of commits, merges, and cleanup authorization.
-- Verified by: Documentation walkthrough of two jobs, closing/reopening the assistant, manager takeover, a pending human decision, and a merge-gated dependency using the implemented tools.
+- Serves: AC4, AC6.
+- Responsibility: Expose job-tagged native queues and record verification evidence without another attention engine.
+- Needs: E1; C2, C4, C5.
+- Produces: Native qitems and evidence in job manifests.
+- Interface: C4 tell/report and C5 attention/answer.
+- Rules: Managed callers must belong to the job or designated fleet; native permissions stay in effect.
+- Verified by: Mock native queues verify stable brief IDs, durable tagged requests, attributed responses and distinct verification evidence.
+- Open: none.
+
+### E5 fleet assignment — new/modify `lib/job-fleet.mjs, bin/rig-fleet, agents/fleet/manager`
+
+- Serves: AC4, AC7.
+- Responsibility: Aggregate jobs and select an optional native coordination seat.
+- Needs: E1, E3, E4; C6.
+- Produces: Fleet membership and native manager reference.
+- Interface: C6 fleet CLI.
+- Rules: Release changes assignment only; no session or job stop; handover delegates upstream.
+- Verified by: Tests prove take identity, release without lifecycle effects, native handover failure, and offline status.
+- Open: none.
+
+### E6 dependency readiness — new/modify `lib/job-dependencies.mjs, lib/job-cli.mjs`
+
+- Serves: AC8.
+- Responsibility: Verify merge-first and sequential-workspace prerequisites.
+- Needs: E1, E4; C2, C7.
+- Produces: Recorded readiness and content handoff.
+- Interface: C7 merged/handoff/dependency-check.
+- Rules: Never integrate code automatically; stale content and abandoned prerequisites block.
+- Verified by: Real Git fixture tests prove merge/stale HEAD/squash attestation and retained same-workspace content.
+- Open: none.
+
+### E7 workflow and documentation — new/modify `skills/job-rigs/SKILL.md, README.md, AGENTS.md, docs/job-rigs.md, culture/CULTURE.md`
+
+- Serves: AC1, AC6, AC7, AC11, AC12.
+- Responsibility: Teach the implemented tools and keep optional/deferred work separate.
+- Needs: E2-E6; C1-C7.
+- Produces: Current instructions, examples and test walkthrough.
+- Interface: Natural requests map to C4-C7; no automatic global installation.
+- Rules: No mandatory global manager or worktree; retain legacy behavior explicitly; shared memory remains deferred.
+- Verified by: Walkthrough commands and all automated tests pass; scope/command links reviewed.
 - Open: none.
 
 ## Wiring
 
 ```mermaid
 flowchart TD
-    H[Human / ordinary assistant] --> S[E7 workflow skill]
-    S --> L[E3 lifecycle and queries]
-    L --> R[E2 complete rig resolution]
-    L --> J[One rig per worktree]
-    L --> D[E1 durable records]
-    J --> A[E4 evidence and attention]
-    A --> D
-    H --> F[E5 optional fleet manager]
-    F --> D
-    F --> A
-    F --> L
-    G[E6 merge-first dependency checks] --> D
-    G --> A
-    S --> G
+  A[Any assistant] --> W[Workspace lifecycle]
+  W --> S[Local job records and reservations]
+  W --> R[Complete native rig / job lead]
+  R --> Q[Native queues and messages]
+  F[Optional native fleet seat] --> Q
+  F --> W
+  D[Dependency checks] --> S
+  A --> Q
 ```
 
 ## Build order
 
-- Milestone 1: Specify and build E1 and E2, then E3; demonstrate one complete job with its own lead under `.worktrees/`, queryable without a global lead.
-- Milestone 2: Exercise E3 concurrency and collision checks with two jobs and same-basename repositories; neither job changes the other's resources.
-- Milestone 3: Complete E3 interruption recovery and stop/resume/delete/detach checks; injected failures preserve recoverable records and files.
-- Milestone 4: Build E4, then E5; demonstrate pending questions with no manager, followed by exclusive takeover and handover.
-- Milestone 5: Build E6; demonstrate independent investigation while blocked and implementation released only after human merge and dependent revision availability.
-- E7 accompanies each milestone, with the final end-to-end walkthrough after E6. E4 and E6 specifications may proceed independently once E1 contracts are stable; E5 consumes E4.
-- Each element receives a detailed specification before implementation. Open integration questions must be resolved or narrowed to an explicit supported fallback in that specification; use `blueprint-execute` once specs exist.
+1. E1 and E2, then E3: one complete job in each workspace mode; concurrency and recovery checks.
+2. E4, then E5 and E6: native attention, optional fleet assignment, dependency readiness.
+3. E7 and combined validation: document the actual commands and test both modes end to end.
+
+Each element receives its own specification before implementation. The direct `blueprint-execute` route is used; this environment does not expose an implementer subagent tool.
 
 ## Decisions
 
-- A complete job rig is the default new abstraction; existing department rigs remain a legacy option during transition.
-- Fleet coordination data persists independently of an agent; a permanent global lead is unnecessary.
-- A job lead owns its assignment and worktree context; an optional manager owns cross-job monitoring and routing.
-- Stable UUIDs and exact manifests replace folder-name inference for new jobs.
-- Instance state lives outside worktrees so removal cannot erase questions, ownership, or evidence.
-- `.worktrees/` is the default checkout location, locally excluded; project worktree tooling may override placement.
-- Project-owned topology is separate from machine paths, credentials, and native permission restrictions; resolved instances are frozen.
-- Human merge is the dependency integration policy; agents never infer that a completed branch is already available to another worktree.
-- Scripts own mechanical state transitions; skills and agents interpret assignments and use those scripts.
-- No automatic changes to existing rigs, profiles, running services, or global permission settings accompany adoption.
+- One complete rig per reserved workspace; the lead owns that job, while a fleet seat is optional.
+- Occupied workspaces produce actionable refusal, not an automatic worktree or takeover.
+- Existing checkout use and managed worktree creation are explicit modes with distinct ownership.
+- Native queues, identity, attachment, handover, per-member models and managed instruction blocks remain OpenRig responsibilities.
+- Fleet release ends coordination, not a session. There are no wrapper leases or extra authentication mechanisms.
+- Job records store only workspace/lifecycle/configuration/evidence/dependency metadata; native task state is not copied locally.
+- Separate-workspace dependencies require human merge; sequential same-workspace work does not manufacture that requirement.
+- Existing services, rigs, profiles and native approval policies remain under their current owners.
 
-## Risks and unknowns
+## Validation and scope boundaries
 
-- E2: Installed OpenRig model fields and managed instruction behavior must be verified for the selected version. Unsupported tracked-target preservation remains a preflight blocker.
-- E2/E3: Current relative agent references and culture placement cannot simply be copied to a state directory; validate a relocatable resource bundle before launch.
-- E3: Shell profiles are executable configuration. A true read-only preview needs declarative data; existing hooks cannot be assumed safe or repeatable because they conventionally call `run`.
-- E3/E4: Launch or notification may succeed before a checkpoint write fails. Reconcile actual state and deduplicate delivery rather than promising transactional external commands.
-- E5: Reading `OPENRIG_SESSION_NAME` alone is not a security boundary. Verify caller identity through supported runtime mechanisms; tokens and saved spawn policy coordinate ownership without overriding native permissions.
-- E5: Directly attaching an already-open Codex conversation to an OpenRig seat is unverified. Managed-seat takeover is an acceptable initial route, with ordinary assistant querying always available.
-- E6: Squash/rebase integration breaks simple ancestry proofs. Preserve explicit human-attested mappings and do not silently weaken readiness checks.
-- E7 / deferred stage: Worktrees share machine CPU, memory, ports, databases, credentials, and external resources. Record environment capability and prevent unsupported concurrent stack claims. Port allocation, isolated databases, resource budgets, scheduling, and admission control are a later design, not part of these milestones.
-- Validation limit: Automated temporary-repository and mocked-daemon tests establish lifecycle contracts; real multi-rig instruction projection, native approvals, seat handover, and human notification require a separately authorized live validation before claiming operational completion.
+- Validate complete instruction launch/cleanup with the native managed-block helpers in temporary fixtures; this is an execution check, not an unresolved architecture question.
+- External CLI attachment supplies identity and queue access; installed `external_cli` bindings explicitly lack inbound tmux send/capture (`daemon/dist/domain/session-transport.js:809`). Polling/ordinary relay works without inventing a transport; active nudges use a managed pane.
+- Native source references inspected (queue CLI env-less rejection also reproduced without contacting the daemon): `dist/commands/whoami.js`, `dist/commands/attach.js`, `dist/commands/seat.js`, `dist/commands/queue.js`, `dist/client.js`, `daemon/dist/routes/queue.js`, `daemon/dist/routes/require-sender-identity.js`, `daemon/dist/domain/managed-blocks.js`, and `daemon/docs/reference/rig-spec.md` in the installed OpenRig 0.6.4 package.
+- External effects can outlive a failed checkpoint. Stable native queue IDs and exact recorded rig/workspace reconciliation prevent blind retries; ambiguous nonrepeatable profile preparation is blocked.
+- Workspaces still share machine resources. Port/database isolation and resource scheduling are deferred; project preparation must disclose limitations and never start user services.
+- Shared knowledge and continuous learning are tracked in the linked future idea, without a current implementation dependency.
+- Automated verification uses real temporary Git repositories and native schema/helpers with a mocked daemon. No real user rig or service is launched for these checks; live harness interaction is the user's final test.

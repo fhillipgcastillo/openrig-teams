@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { fleetMain } from '../lib/job-fleet.mjs';
+
+await fleetMain(process.argv.slice(2));

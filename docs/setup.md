@@ -54,7 +54,7 @@ versions to refresh machine-specific links.
 
 Settings live at
 `${OPENRIG_TEAMS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/openrig-teams}/runtime.json`.
-The separate `config.env` controls lead job spawning; `projects/*.sh` contain
+The separate `config.env` controls legacy lead spawning (`LEAD_MAY_SPAWN`) and optional complete-job fleet spawning (`FLEET_MAY_SPAWN`); `projects/*.sh` contain
 project onboarding. Runtime settings do not grant spawning permission.
 
 ```json
@@ -121,17 +121,16 @@ whether the installed Codex can load the profile. See [Codex details](codex-setu
 
 ## Preview and launch
 
+Complete jobs need no global lead. Choose an explicit workspace mode and inspect its plan:
+
 ```sh
-bin/rig-home lead plan
-bin/rig-home lead up
-rig ps --nodes --rig lead
+bin/rig-job start demo feature --repo /path/to/project --workspace /path/to/project --brief "Task and done criteria" --plan
+bin/rig-job start demo feature --repo /path/to/project --worktree --brief "Task and done criteria" --plan
 ```
 
-Inspect the selected runtime and pending permission actions in the plan. Check
-live seat state after launch; a startup prompt can still require human input.
-Do not stop an existing rig occupying the name without its owner's approval.
-Plans use separate ignored `.plan.yaml` files. Department jobs follow the
-[README workflow](../README.md#daily-workflow) and [project profile contract](project-profile.md).
+Execute the selected command without `--plan` when authorized, then inspect `bin/rig-job status UUID`. See [the walkthrough](job-rigs.md). These plans write no files and execute no shell profiles. Complete-job mixed-seat/model overrides belong in [project settings](project-profile.md), using `pod.member` keys. The machine seat table above remains for legacy departments.
+
+Legacy `bin/rig-home lead plan/up` and `bin/rig-team` still work, using separate ignored `.plan.yaml` files. They are optional and do not implement complete-job reservations. Never stop an existing rig to make room without authorization.
 
 ## Project instructions and generated files
 
@@ -148,8 +147,8 @@ content; the wrappers never generically copy or overwrite instruction files.
 
 `bin/rig-exclude <project> --runtime codex|claude-code|both` updates a marked
 block in shared `.git/info/exclude` for every worktree, without changing
-`.gitignore`. With no runtime flag it selects `both`. `rig-job` supplies the
-union of effective runtimes in its selected teams. Only selected artifacts are
+`.gitignore`. With no runtime flag it selects `both`. Legacy `rig-job --teams` supplies the
+union of effective runtimes in its selected teams. Complete jobs manage their own selected resource exclusions and permit tracked AGENTS.md/CLAUDE.local.md through native managed-block preservation. Only selected artifacts are
 checked; existing artifact exclusions are retained when later jobs use another
 runtime. A tracked generated path causes refusal before exclusion changes;
 resolve the collision deliberately before launch. An ignore rule does not

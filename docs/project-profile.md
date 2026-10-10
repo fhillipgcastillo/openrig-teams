@@ -1,4 +1,54 @@
-# Project profile — what a project needs to tell rig-job
+# Project configuration and preparation
+
+Complete jobs work without a profile: supply `--repo PATH` and an explicit `--workspace PATH` or `--worktree`. Existing mode preserves the current branch and does not run worktree hooks. Managed worktrees default to `project/.worktrees/NAME` and a new `feature/NAME` branch.
+
+## Complete-job project settings
+
+Optional `.openrig-teams/project.json` belongs to the project. Example:
+
+```json
+{
+  "version": 1,
+  "integrationBranch": "main",
+  "worktreeDirectory": ".worktrees",
+  "seats": {
+    "verify.reviewer": {"runtime": "claude-code", "model": "your-selected-model", "approval": "native"}
+  },
+  "environment": {
+    "concurrentStacks": "unsupported",
+    "notes": "Separate checkouts share local ports and database; do not run parallel stacks."
+  }
+}
+```
+
+`template` can select a project-relative complete native RigSpec. It must include `control.lead` and separate reviewer/tester seats. Change topology there and use project `seats` keyed by `pod.member` for runtime/model/approval overrides. Native model support and permissions still apply. Machine runtime/per-runtime approval defaults come from `runtime.json`; its legacy department seat keys do not select complete-job seat overrides. Resolved instances retain their configuration when resumed.
+
+Templates use native local/path AgentSpec references and a nearby culture file. Rendered instances freeze the rig definition/culture and resolve AgentSpec locations; the referenced role resources remain files, so keep those resources available. Project instructions still govern project work.
+
+## Complete-job shell profiles
+
+Profiles live in `~/.config/openrig-teams/projects/NAME.sh`, with existing config-root overrides. `profile-init NAME` creates a legacy-compatible starting file; review it before use. New complete-job plans read literal declarations without sourcing the shell file. They do not execute hooks, print hypothetical hook output, install dependencies, or create state/exclusions.
+
+Declare `PROJECT_PATH` literally (HOME substitution allowed), or supply `--repo`. `BASE_BRANCH` chooses the managed job base. A custom `profile_create_worktree()` requires `WORKTREE_PATH` declared predictably with PROJECT_PATH/JOB/HOME substitutions; the hook must create that exact checkout and retain `WORKTREE` at that path. Default Git creation needs no hook/declaration.
+
+| Hook/field | Complete-job behavior |
+|---|---|
+| `COPY_FILES=(...)` | Copies missing untracked inputs for managed worktrees only; paths are workspace-relative |
+| `profile_create_worktree()` | Managed mode only; creates declared linked checkout/branch relationship |
+| `profile_prepare_worktree()` | Managed mode only; runs in the new workspace |
+| `profile_prepare_existing_workspace()` | Existing mode only, when explicitly defined; runs in that checkout |
+| `profile_remove_worktree()` | Explicit managed deletion only; must remove directory and Git registration |
+| `PREPARE_REPEATABLE=1` | Allows retrying interrupted preparation; omit when preparation cannot safely repeat |
+
+Mutating hooks receive `PROJECT_PATH`, `JOB`, `BRANCH`, `BASE_BRANCH`, `WORKTREE`, `PLAN=0`, and `run`, `say`, `die`. `BASE_BRANCH` is initialized to the frozen base commit before sourcing your profile; keep creation based on the intended revision. Keep declarations side-effect-free: the shell file may be sourced more than once during preparation. Existing mode does not copy worktree inputs or run worktree hooks. Profile changes block continuation until the original contract is restored.
+
+Never start servers/databases or regenerate secrets in preparation. Document missing inputs and project isolation limits. No generic port/database allocation is provided this round. Native tracked AGENTS.md/CLAUDE.local.md content is preserved around managed blocks, with cleanup snapshots. Other tracked generated resources refuse launch. Local shared exclusions retain earlier runtime artifacts and hide the default `.worktrees/` directory without editing `.gitignore`.
+
+`doctor` and standalone `rig-exclude` remain **legacy** validators: they source the shell contract and reject tracked managed instruction targets. Use complete-job `start … --plan` for its actual preflight. Custom hooks and runtime interactions still need a live project check.
+
+---
+
+# Legacy department profile reference
 
 A profile teaches `bin/rig-job` how one project creates and prepares a worktree.
 It lives **outside this repo**, in `~/.config/openrig-teams/projects/<project>.sh`

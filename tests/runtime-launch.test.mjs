@@ -72,7 +72,7 @@ test('all shared roles retain both harness resources and validate with OpenRig',
       count++;
     }
   }
-  assert.equal(count, 9);
+  assert.equal(count, 14);
 });
 
 test('plan preserves the launch spec and does not query or change seats', t => {
