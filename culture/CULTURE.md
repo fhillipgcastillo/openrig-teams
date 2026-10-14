@@ -1,3 +1,7 @@
+# Legacy department culture
+
+This file governs the retained global-lead/department templates. Complete job and optional fleet templates use `culture/JOB-CULTURE.md`; their leads work inside the assigned workspace and do not require a global lead.
+
 # Culture — how every seat in these teams works
 
 These rules apply to every rig in this repository. Project rules (code style,

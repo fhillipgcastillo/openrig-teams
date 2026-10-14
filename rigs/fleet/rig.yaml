@@ -1,0 +1,16 @@
+version: "0.2"
+name: fleet-template
+summary: Optional native fleet coordination seat
+culture_file: CULTURE.md
+managed_blocks:
+  claude-code: CLAUDE.local.md
+pods:
+  - id: control
+    label: Control
+    members:
+      - id: manager
+        agent_ref: "local:../../agents/fleet/manager"
+        runtime: codex
+        profile: default
+        cwd: "."
+edges: []

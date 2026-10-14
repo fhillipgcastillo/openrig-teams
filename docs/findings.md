@@ -75,3 +75,44 @@ not exercised · ❌ does not work.
 - The full builder → reviewer + tester chain end to end (stopped at the builder's
   shell prompt — needs auto mode).
 - Auto mode on any seat.
+
+## Independent job rigs — automated validation (2026-10-10, OpenRig 0.6.4)
+
+The reconciled [blueprint](blueprints/2026-10-09-independent-job-rigs.md) and
+[walkthrough](job-rigs.md) describe the implemented complete-job path. Historical
+findings above refer to the versions/workflows explicitly named there.
+
+`node --test --test-reporter=tap tests/*.test.mjs`: **66 passed, 0 failed** on
+Node 24.21.0. Tests use temporary Git repositories/configuration, a mocked daemon,
+and the installed native RigSpec/AgentSpec validators and managed-block helpers.
+Temporary executable spawning required running the suite outside this session's
+filesystem sandbox. No live user rig/service was started, stopped, or modified.
+
+Verified cases include both workspace modes, nested Git worktrees, canonical
+alias/concurrent-start refusal, private persisted records, nonmutating previews,
+legacy occupancy, runtime/model freezing, tracked instruction preservation and
+user edits/deletion, stopped reservations, lost launch/resume/retirement
+responses, partial launch retirement, failed/dirty cleanup, durable attention and
+replies, independent verification evidence, fleet assignment/release/handover,
+human-merge readiness, squash attestation, stale prerequisite content, and
+sequential retained uncommitted handoffs. Additional assertions checked fleet
+retry identity, handover failure, abandoned prerequisites, and continuation under a different native caller without rewriting the original brief author.
+
+The native queue CLI was independently invoked without seat environment; it
+rejected the write before daemon contact (`--source is required when
+OPENRIG_SESSION_NAME is not set`). Ordinary shell wrappers therefore use the
+installed native DaemonClient and queue API with declared `openrig-teams-shell`
+source/actor. The installed sender resolver records this as `claimed:v1`; tests
+exercise the actual client with a fake fetch and the actual sender resolver,
+verifying no forged seat header. Managed callers use native CLI identity. Native
+queue storage, idempotency, transport, and restrictions remain authoritative.
+
+Syntax checks passed for all 12 new entry points/modules; the seven element
+specs contain identical shared contracts. Documentation file links resolve and
+`git diff --check` passes. Added function bodies contain no prose comments.
+
+Still unverified live: complete-job launch against the running daemon, real
+Codex/Claude interaction and permission timing, project-specific preparation,
+external CLI attachment/handover, and connector delivery. These are execution
+checks for the user's live test, not new architectural requirements. Environment
+isolation and the external continuous-learning integration remain deferred.

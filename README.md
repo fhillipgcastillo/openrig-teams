@@ -1,215 +1,88 @@
 # openrig-teams
 
-Department teams for [OpenRig](https://openrig.dev), reusable across projects.
-One lead talks to you; department teams (FE, BE, DevOps) are generated per git worktree from shared templates, so several jobs can run side by side.
+Reusable complete teams for [OpenRig](https://openrig.dev), with an independent lead, builder, reviewer, and tester for each job. Use an existing checkout or an optional Git worktree. Supports Codex, Claude Code, mixed seats, and project templates with OpenRig 0.6.4.
 
-Supports **Claude Code, Codex CLI, and mixed teams** with OpenRig **0.6.4**.
-[Setup](docs/setup.md) saves your runtime and approval choices locally.
-
-**Setting this up with an agent?** Hand it [`AGENTS.md`](AGENTS.md): machine
-setup, onboarding a project, and running a job, each step with a check.
-
-## The idea
-
-```
-                       ┌─────────────┐
-            you ──────▶│    LEAD     │  rigs/lead   (runs in homes/lead, outside any repo)
-                       └──────┬──────┘  + optional PM: rigs/pm (homes/pm)
-         ┌────────────────────┼────────────────────┐
-         ▼                    ▼                    ▼
-   ┌───────────┐        ┌───────────┐        ┌───────────┐
-   │ FE team   │──────▶ │ BE team   │        │ DevOps    │
-   │ builder   │  hand  │ builder   │        │ operator  │
-   │ reviewer  │  off   │ reviewer  │        │           │
-   │ tester    │        │ tester    │        │           │
-   └───────────┘        └───────────┘        └───────────┘
-   one copy per job, each inside that job's worktree
+```text
+Any assistant ──▶ job tools ──▶ Job A rig ──▶ existing checkout
+                          └──▶ Job B rig ──▶ project/.worktrees/feature-b
+Optional fleet manager ──────▶ each job's lead and native queues
 ```
 
-- **One job = one worktree = one branch.** A department team for a job runs
-  inside that job's worktree; reviewer and tester read the builder's copy.
-- **The lead never writes and never reads project folders.** It delegates and
-  reports. It lives in `homes/lead`, so one lead serves every project.
-- **Project rules come from the project.** Seats start inside the worktree, so
-  they load its instructions and skills for the selected CLI. The templates hold
-  only roles; the project profile handles any instruction bridge.
-- **You merge.** No seat commits, pushes, opens PRs or touches release metadata
-  (see `culture/CULTURE.md`).
+One unfinished job reserves one workspace. A competing request names the occupant and offers using its rig or requesting a separate worktree. Stopping keeps that reservation; finishing releases it. No global lead is required.
 
-## Layout
+## Setup
 
-```
-bin/
-  setup        create every machine-specific link and folder (run after clone)
-  rig-home     lead / pm: plan | up | down | resume | remove | name | permissions
-  rig-team     per worktree: plan | up | down | resume | remove | name | permissions
-  rig-job      start | finish | can-spawn | profile-init | doctor — the one entry point for jobs
-  rig-runtime  render saved runtime/approval choices; validate launch prerequisites
-  rig-exclude  once per project: hide OpenRig's files in all its worktrees (.git/info/exclude)
-rigs/<team>/rig.yaml          shared team templates; wrappers render your saved runtime choices
-rigs/<team>/CULTURE.md        link → culture/CULTURE.md, created by bin/setup (gitignored)
-agents/<dept>/<role>/         agent.yaml + guidance/role.md per seat
-agents/shared                 link to OpenRig's built-in shared skills, created by bin/setup (gitignored)
-culture/CULTURE.md            rules every seat follows
-homes/                        working folders for lead / pm (gitignored)
-docs/findings.md              what was tested, what is verified, what is not
-AGENTS.md                     step-by-step setup for an agent: machine, project, job
-CLAUDE.md                     imports AGENTS.md for Claude Code
-docs/setup.md                 runtime, approval, and mixed-team setup
-docs/project-profile.md       what a project profile has to decide
-profiles/_template.sh         starting point for a profile
+Follow [setup](docs/setup.md) to install OpenRig and authenticate the selected coding CLIs. Preview `bin/setup --plan`, then save the same runtime and approval choices with `bin/setup`. Setup also links OpenRig's shared AgentSpec resources. Rerun after changing Node or OpenRig versions. No rig launch is needed during setup.
+
+## Start a job
+
+Run these wrappers from this repository. Replace the example project path and brief:
+
+```sh
+bin/rig-job start myproject feature-a --repo /path/to/project --workspace /path/to/project --brief "Implement A; done means …" --plan
+bin/rig-job start myproject feature-a --repo /path/to/project --workspace /path/to/project --brief "Implement A; done means …"
 ```
 
-## One-time setup
+For a separate branch and checkout, choose `--worktree` instead of `--workspace`:
 
-1. Follow [setup](docs/setup.md) to install OpenRig and authenticate your selected
-   CLI(s). Back up the selected harness configuration before first launch.
-2. Run `bin/setup --plan` to choose runtime and approval preferences, then
-   `bin/setup` with the same choices to save them. Equivalent flags support noninteractive
-   setup, including per-seat overrides for mixed teams.
-3. Preview with `bin/rig-home lead plan`, then launch with `bin/rig-home lead up`.
-   Rerun setup after upgrading OpenRig or switching Node versions.
-
-Use the wrappers to apply saved preferences. Direct launches of tracked
-`rig.yaml` templates use their Codex baseline instead.
-
-## Daily workflow
-
-```
-0. bin/rig-exclude <project>                  once per project (see AGENTS.md Part 2)
-1. bin/rig-home lead up                       start the lead (once; keep it running)
-2. bin/rig-job start <project> <job> --teams fe[,be,devops] [--plan] [--brief "<job>"]
-                                              branch + worktree + untracked files + teams
-3. rig send control-lead@lead "<the job>"     (or use --brief above)
-4. review the branch and merge it yourself
-5. bin/rig-job finish <project> <job> --teams fe [--worktree]
+```sh
+bin/rig-job start myproject feature-b --repo /path/to/project --worktree --brief "Implement B; done means …" --plan
+bin/rig-job start myproject feature-b --repo /path/to/project --worktree --brief "Implement B; done means …"
 ```
 
-`rig-job` is the one entry point for both you and any agent, so the steps are
-never assembled by hand. By hand, the same thing is: project tooling for the
-branch and worktree, `bin/rig-exclude`, then `bin/rig-team <team> <worktree> up`.
+The default directory is `/path/to/project/.worktrees/feature-b`. Local Git exclusions hide generated files and this directory without changing the project's `.gitignore`. Existing checkout mode preserves the current branch, staged changes, and user files. Managed mode refuses an existing branch/path.
 
-`rig tui` shows everything; `rig ps --nodes -A` lists every seat address.
+Commands return a job UUID and its unique lead address. Use the UUID for later operations:
 
-`start` refuses an existing branch before runtime checks, worktree hooks,
-dependency preparation or team launches, including in `--plan`. Its error shows
-the repository's registered worktrees. Choose a different `--branch` or inspect
-and explicitly clean up the existing branch/worktree before retrying.
-
-`finish` keeps files unless a cleanup flag is selected:
-
-- `--worktree` deletes the worktree through the profile hook or Git. It verifies
-  that both the folder and Git registration are gone. Dirty files can prevent
-  deletion; the command fails rather than forcing their removal.
-- `--detach-worktree` removes only the selected Git registration and its `.git`
-  link, preserving the folder and all other files, including unfinished work.
-  It bypasses the profile's deletion hook. The folder becomes an ordinary
-  directory; inspect or move it before reusing that path.
-
-Both choices keep the branch. Removing a worktree does not remove its branch;
-an existing branch will still prevent `start`. Use `--plan` to preview cleanup.
-
-If a seat's `rig` reads cannot reach the daemon, do not infer that teams are
-missing. Codex seats should retry through their native approval mechanism when
-the sandbox blocks access. A rejected or failed retry is a connectivity blocker,
-not a reason to spawn replacements or restart the daemon.
-
-### Config and project profiles (outside this repo)
-
-`~/.config/openrig-teams/` (created by `bin/setup`) is machine-local and never
-tracked (`OPENRIG_TEAMS_CONFIG` or `XDG_CONFIG_HOME` can change the base):
-
-```
-runtime.json                default runtime, per-runtime approvals, per-seat overrides
-config.env                  LEAD_MAY_SPAWN=0   the lead may run rig-job only when 1
-projects/<project>.sh       how that project creates and prepares a worktree
+```sh
+bin/rig-job list
+bin/rig-job status JOB_UUID
+bin/rig-job tell JOB_UUID --message "Update the acceptance criteria …"
+bin/rig-job stop JOB_UUID
+bin/rig-job resume JOB_UUID
+bin/rig-job finish JOB_UUID --plan
+bin/rig-job finish JOB_UUID
 ```
 
-A profile holds the project's path and base branch, the untracked files to copy
-into each worktree (`COPY_FILES`), and optional hooks to create, prepare and
-remove the worktree. `bin/rig-job profile-init <project>` starts one from
-`profiles/_template.sh`; `docs/project-profile.md` lists what to decide;
-`bin/rig-job doctor <project>` checks it. Without a profile, `--repo <path>`
-uses plain git.
+Finish keeps the workspace and branch. Explicit `finish JOB_UUID --worktree` removes an owned worktree; `--detach-worktree` unregisters it while preserving files. Both retain the branch. Existing checkouts cannot be removed/detached by these tools. Dirty worktree deletion fails without forcing removal. Use `continue JOB_UUID` for an interrupted start, and inspect any ambiguity reported before changing resources.
 
-`LEAD_MAY_SPAWN` is enforced by the script, which reads the calling seat's
-`OPENRIG_SESSION_NAME`: with 0 the lead is refused; builders, reviewers and
-testers are always refused; a human shell has no such variable and is allowed.
+See the [test walkthrough and command reference](docs/job-rigs.md), [project configuration](docs/project-profile.md), [agent workflow skill](skills/job-rigs/SKILL.md), and [implementation blueprint](docs/blueprints/2026-10-09-independent-job-rigs.md).
 
-### Names
+## Optional fleet
 
-Generated teams are named `<team>-<project>-<worktree folder>`, seats
-`team-<role>@<that name>`:
+An ordinary assistant can list jobs, inspect attention requests, and relay instructions at any time. Persistent native coordination is optional:
 
-```
-bin/rig-team fe <path>/worktree-rapid-river-5846 name     (worktree of skoolscout-com)
-→ fe-skoolscout-com-worktree-rapid-river-5846
-→ seats team-builder@…, team-reviewer@…, team-tester@…
+```sh
+bin/rig-fleet create features
+bin/rig-fleet add features JOB_UUID
+bin/rig-fleet up features --plan
+bin/rig-fleet up features
+bin/rig-fleet status features
+bin/rig-fleet release features
 ```
 
-The project part comes from the repo's main checkout folder, so two projects
-with same-named worktrees never collide. `rig-team` refuses a main checkout.
+`up` creates a native manager seat in its own state-directory home. Alternatively `take features --seat ADDRESS` selects an existing native seat; selection does not attach the calling assistant. Use native attachment/handover for occupation. Release ends coordination and leaves all sessions, jobs, and queues intact. External CLI seats poll queues because their native binding has no inbound pane transport.
 
-### Actions
+Separate-workspace dependencies require a human merge and the merged revision in the dependent workspace. Sequential work in one checkout can use verified retained content after retiring the previous job, without manufacturing a commit. See [dependency examples](docs/job-rigs.md#dependencies).
 
-| Action | `rig-team` / `rig-home` does |
-|---|---|
-| `plan` | write a separate ignored `.plan.yaml`; preview launch and deferred Claude permission steps |
-| `up` | render saved choices and launch; save Claude approval choices for the next launch |
-| `down` | stop with a snapshot (keeps the record) |
-| `resume` | verify existing seat runtimes, apply Claude approval choices, then relaunch by name |
-| `remove` | stop, delete the record, delete the generated spec |
-| `name` | print the rig name only |
-| `permissions` | verify existing seat runtimes and explicitly save Claude approval preferences |
+## Configuration and boundaries
 
-Earlier live testing is recorded in [findings](docs/findings.md), with its
-original version/date and verification limits. Current automated tests use
-temporary configurations and mocked lifecycle commands; they do not prove
-native interactive approval behavior.
+Machine runtime/approval choices remain in `~/.config/openrig-teams/runtime.json`. Project hooks live in `projects/<name>.sh`; project templates, seat models/runtimes/approvals, and environment limitations can live in `.openrig-teams/project.json`. Resolved instances retain their original choices on resume.
 
-## Portability
+State defaults to `~/.local/state/openrig-teams`, overridable with `OPENRIG_TEAMS_STATE` or `XDG_STATE_HOME`. Native OpenRig owns seat identity, task queues, attachment, and handover. Ordinary shell queue writes use its installed client/API and declared `claimed:v1` provenance; managed seats use native CLI identity. Local records track workspace ownership, frozen configuration, verification evidence, and dependencies. Do not give concurrent controllers different state roots.
 
-Nothing committed depends on this machine. Everything that does is created by
-`bin/setup` and gitignored:
+This round does not isolate ports, databases, dependencies, or machine resources. Projects must supply their own preparation/isolation policy. Shared continuous learning is tracked as a [future external integration](docs/shared-knowledge-integration-idea.md). Tools never start or reset user services.
 
-| Created by setup | Why it can't be committed |
-|---|---|
-| `agents/shared` → OpenRig's shared skills | lives inside the global package folder, which depends on the Node manager (nvm, system, bun) and version. Setup finds it by following the `rig` binary to its installed package |
-| `rigs/*/CULTURE.md` → `culture/CULTURE.md` | OpenRig requires the culture file beside `rig.yaml` (no `..` paths); git can check symlinks out as plain files on some systems |
-| `homes/lead`, `homes/pm` | per-machine working folders; OpenRig writes the selected harnesses' managed instructions and resources there |
+Approval modes keep native restrictions. Claude preferences saved after initial launch apply on a subsequent launch; no automatic restart occurs. The fleet seat may change job lifecycle only with separately saved `FLEET_MAY_SPAWN=1`; job leads cannot spawn siblings. No seat approves another seat's prompts.
 
-Also per machine, outside this repo: selected CLI authentication, native
-workspace trust and hooks, and saved runtime/approval preferences.
-Team files use only relative agent references (`local:../../agents/...`), and
-the scripts locate the repo from their own position, so the clone can live
-anywhere.
+## Legacy workflow
 
-## Cost
+`bin/rig-home`, `bin/rig-team`, and `bin/rig-job-legacy` retain the department/global-lead workflow. Existing `rig-job … --teams …` commands and old non-UUID finish commands route to that implementation. For compatibility, an old start lacking both workspace flags also retains legacy behavior; use an explicit workspace mode for all new complete jobs. Legacy doctor/exclude checks are stricter about tracked instruction files. Existing rigs and profiles are not migrated or stopped automatically.
 
-The previous Claude setup measured ~310 MB per `claude` process, ~660 MB with
-its MCP servers. Codex memory use has not been measured. Each seat uses your
-plan's allowance. Lead + one FE job is 4
-seats; a full-stack job adds 3 more. Start only the departments a job needs
-and `remove` them when the branch is done.
+## Validation
 
-## Permissions
+```sh
+node --test tests/*.test.mjs
+```
 
-Choose `native` or `auto` per runtime, with optional seat overrides. Codex auto
-uses the optional `openrig-auto` profile; native adds no named profile. Claude
-native records `floor`; Claude auto records OpenRig's native `auto` selection.
-Native and managed rules remain in effect.
-
-Claude preferences are saved after the first launch and apply on a subsequent
-launch. `permissions` saves them explicitly; `resume` saves them before launch.
-There are no automatic restarts. Changing harnesses or Codex profiles requires
-newly generated rigs; resuming keeps those stored choices. Existing Claude
-seats can change approval mode through `permissions` / `resume` after runtime
-verification. See [setup and approval timing](docs/setup.md#approval-modes-and-existing-seats).
-
-No full bypass, broad command allowance, or lead permission broker is enabled.
-Auto-review can reject actions, and startup trust or native restrictions can
-still require human input. Lead spawning remains a separate local choice,
-disabled by default.
-
-The separate approval-design discussion prompt is in
-[`docs/approval-design-session.md`](docs/approval-design-session.md).
+Tests use temporary Git repositories, the installed native schemas/managed-block helpers, and a mocked daemon. Native interactive harness behavior still needs the [live walkthrough](docs/job-rigs.md). Historical live findings retain their original version/date in [findings](docs/findings.md).

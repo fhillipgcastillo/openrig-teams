@@ -2,3 +2,5 @@ agents/shared
 homes/
 rigs/*/rig.*.yaml
 rigs/*/CULTURE.md
+!rigs/job/CULTURE.md
+!rigs/fleet/CULTURE.md
