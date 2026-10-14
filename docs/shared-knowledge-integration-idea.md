@@ -25,6 +25,12 @@ This idea adds no current acceptance criterion, implementation element, memory
 service, storage format, retrieval API, synchronization process, or automatic
 learning behavior. Current job operation must not depend on the future system.
 
+## Existing global hook interaction
+
+The [2026-10-14 investigation report](https://github.com/fhillipgcastillo/agentic-memory/blob/main/docs/learning/2026-10-14-hook-isolation-and-session-end-issues.md) in agentic-memory records the user's report of journal/Learning activity triggering the lead and completion timeouts. A synthetic check reproduced AI Hub's legacy journal writer preserving OpenRig identity variables and an inherited Anthropic API key. The exact lead activation chain and OAuth/timeout cause remain unverified. See also [the global hook inheritance finding](findings.md#files-openrig-writes-into-a-seats-folder).
+
+AI Hub owns the implicated launchers; this repository is the affected integration context. This reference does not add a Learning implementation dependency to job rigs. The report is available locally at `docs/learning/2026-10-14-hook-isolation-and-session-end-issues.md` in the separate agentic-memory checkout; the repository link becomes available after the report is pushed.
+
 ## Questions for the future integration
 
 - Which knowledge should be shared within a pod, project, or across projects?
