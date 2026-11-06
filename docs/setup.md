@@ -7,7 +7,9 @@ rigs. The tracked templates use Codex as a baseline, so launch through
 
 ## Prerequisites and first setup
 
-This integration targets OpenRig 0.6.4. Install OpenRig separately if needed
+The last tested compatible OpenRig is **0.6.4 (63428628)**, recorded on
+2026-11-06 from the installed `rig --version`. See [validation findings](findings.md)
+for the tested scope and remaining live limitations. Install OpenRig separately if needed
 (`npm install -g @openrig/cli@0.6.4`), then check `rig --version`,
 `node --version` (22 or 24), and `tmux -V`. Install and authenticate only the
 coding CLIs you select: `codex`, `claude`, or both. For Codex, verify

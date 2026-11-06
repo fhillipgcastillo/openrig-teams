@@ -1,5 +1,34 @@
 # Dated lessons learned
 
+## 2026-10-15 — Execution workflow scope starts at rig task receipt
+
+**Mistake:** Included references to already-working Learning integration in
+execution requirements and checks, creating an unnecessary implementation target.
+
+**Rule:** Workflow definitions and their implementation Blueprint begin when
+the rig receives assigned tasks. Cover locating supplied Blueprint/element specs
+and the execution process only. Omit Learning, journal, and related integration
+references entirely, including preservation or verification requirements; the
+user confirms those facilities already work. Do not describe activities before
+the task reaches the rig as workflow stages.
+
+**Trigger:** Maintaining spec-driven execution workflow documents in openrig-teams.
+
+## 2026-10-14 — Keep Blueprint workflow discussions focused on execution
+
+**Mistake:** Expanded a request for custom spec-driven rig workflows into
+handoff infrastructure, evidence enforcement, and Learning integration design,
+then presented too much detail.
+
+**Rule:** Blueprint and element-spec preparation remain outside rigs. Once
+the documents are ready, the user can continue implementation in the current
+session or dispatch them to a rig. Focus custom workflow discussions on how
+seats execute the written specs, replacing redundant planning stages. Do not
+introduce a handoff subsystem or adjacent integration work unless requested.
+Give concise, structured answers and expand only the point under discussion.
+
+**Trigger:** Defining Blueprint-based execution workflows in openrig-teams.
+
 ## 2026-10-10 — Verify OpenRig capabilities before classifying design risks
 
 **Mistake:** The design discussion presented agreed workspace concurrency

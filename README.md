@@ -2,6 +2,8 @@
 
 Reusable complete teams for [OpenRig](https://openrig.dev), with an independent lead, builder, reviewer, and tester for each job. Use an existing checkout or an optional Git worktree. Supports Codex, Claude Code, mixed seats, and project templates with OpenRig 0.6.4.
 
+Last tested compatible OpenRig: **0.6.4 (63428628)**, installed as `@openrig/cli@0.6.4` and recorded on 2026-11-06. See [validation findings](docs/findings.md) for the tested scope and remaining live limitations.
+
 ```text
 Any assistant ──▶ job tools ──▶ Job A rig ──▶ existing checkout
                           └──▶ Job B rig ──▶ project/.worktrees/feature-b
